@@ -14,8 +14,13 @@ function TabButton({ icon, label, active, onClick }) {
   )
 }
 
+const PEDIDO_SELECT = '*, cliente:clientes(id,nome), pedido_itens(*, unidade:unidades(id,nome)), pedido_pagamentos(*, metodo_pagamento:metodos_pagamento(id,nome))'
+
 export default function App() {
   const [pedidos, setPedidos] = useState([])
+  const [clientes, setClientes] = useState([])
+  const [unidades, setUnidades] = useState([])
+  const [metodosPagamento, setMetodosPagamento] = useState([])
   const [loading, setLoading] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
@@ -24,7 +29,7 @@ export default function App() {
   async function fetchPedidos() {
     const { data, error } = await supabase
       .from('pedidos')
-      .select('*, pedido_itens(*)')
+      .select(PEDIDO_SELECT)
       .order('created_at', { ascending: false })
 
     if (error) setErro(error.message)
@@ -32,11 +37,26 @@ export default function App() {
       setErro('')
       setPedidos(data || [])
     }
-    setLoading(false)
+  }
+
+  async function fetchListasFixas() {
+    const [clientesRes, unidadesRes, metodosRes] = await Promise.all([
+      supabase.from('clientes').select('*').eq('ativo', true).order('nome'),
+      supabase.from('unidades').select('*').eq('ativo', true).order('nome'),
+      supabase.from('metodos_pagamento').select('*').eq('ativo', true).order('nome'),
+    ])
+    if (clientesRes.error) setErro(clientesRes.error.message)
+    else setClientes(clientesRes.data || [])
+
+    if (unidadesRes.error) setErro(unidadesRes.error.message)
+    else setUnidades(unidadesRes.data || [])
+
+    if (metodosRes.error) setErro(metodosRes.error.message)
+    else setMetodosPagamento(metodosRes.data || [])
   }
 
   useEffect(() => {
-    fetchPedidos()
+    Promise.all([fetchPedidos(), fetchListasFixas()]).then(() => setLoading(false))
   }, [])
 
   async function criarPedido(form) {
@@ -44,7 +64,7 @@ export default function App() {
     const { data: pedido, error: erroPedido } = await supabase
       .from('pedidos')
       .insert({
-        cliente: form.cliente,
+        cliente_id: form.cliente_id,
         data_pedido: form.data_pedido,
         data_entrega: form.data_entrega || null,
         obs: form.obs || null,
@@ -63,6 +83,7 @@ export default function App() {
       pedido_id: pedido.id,
       produto: it.produto,
       quantidade: it.quantidade,
+      unidade_id: it.unidade_id,
     }))
 
     const { error: erroItens } = await supabase.from('pedido_itens').insert(itensParaInserir)
@@ -90,10 +111,23 @@ export default function App() {
     await fetchPedidos()
   }
 
-  async function avancarStatus(pedido) {
-    const proximo = pedido.status === 'separado' ? 'entregue' : pedido.status
-    const { error } = await supabase.from('pedidos').update({ status: proximo }).eq('id', pedido.id)
-    if (error) setErro(error.message)
+  // Conclui a entrega: grava as formas de pagamento usadas e avança o status.
+  // pagamentos: [{ metodo_pagamento_id, valor }, ...] — pelo menos um item, valor > 0
+  async function concluirEntrega(pedidoId, pagamentos) {
+    const linhas = pagamentos.map((p) => ({
+      pedido_id: pedidoId,
+      metodo_pagamento_id: p.metodo_pagamento_id,
+      valor: p.valor,
+    }))
+
+    const { error: erroPagamentos } = await supabase.from('pedido_pagamentos').insert(linhas)
+    if (erroPagamentos) {
+      setErro(erroPagamentos.message)
+      return
+    }
+
+    const { error: erroStatus } = await supabase.from('pedidos').update({ status: 'entregue' }).eq('id', pedidoId)
+    if (erroStatus) setErro(erroStatus.message)
     else setErro('')
     await fetchPedidos()
   }
@@ -154,14 +188,21 @@ export default function App() {
       )}
 
       <main className="main">
-        {tab === 'novo' && <NovoPedido onCriarPedido={criarPedido} salvando={salvando} />}
+        {tab === 'novo' && (
+          <NovoPedido onCriarPedido={criarPedido} salvando={salvando} clientes={clientes} unidades={unidades} />
+        )}
         {tab === 'compras' && (
           <Compras pedidos={pedidos} onAtualizarItem={atualizarItem} onCompletarPedido={completarPedido} />
         )}
         {tab === 'pedidos' && (
-          <Pedidos pedidos={pedidos} onAvancarStatus={avancarStatus} onExcluirPedido={excluirPedido} />
+          <Pedidos
+            pedidos={pedidos}
+            metodosPagamento={metodosPagamento}
+            onConcluirEntrega={concluirEntrega}
+            onExcluirPedido={excluirPedido}
+          />
         )}
-        {tab === 'painel' && <Painel pedidos={pedidos} />}
+        {tab === 'painel' && <Painel pedidos={pedidos} clientes={clientes} metodosPagamento={metodosPagamento} />}
       </main>
     </div>
   )

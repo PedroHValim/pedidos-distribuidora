@@ -3,27 +3,28 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Field } from './ui.jsx'
 import { todayISO } from '../utils.js'
 
-const novoItem = () => ({ produto: '', quantidade: 1 })
-const pedidoVazio = () => ({
-  cliente: '',
+const novoItem = (unidadeIdPadrao) => ({ produto: '', quantidade: 1, unidade_id: unidadeIdPadrao || '' })
+const pedidoVazio = (unidadeIdPadrao) => ({
+  cliente_id: '',
   data_pedido: todayISO(),
   data_entrega: '',
   obs: '',
-  itens: [novoItem()],
+  itens: [novoItem(unidadeIdPadrao)],
 })
 
-export default function NovoPedido({ onCriarPedido, salvando }) {
-  const [form, setForm] = useState(pedidoVazio())
+export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades }) {
+  const unidadeIdPadrao = unidades[0]?.id || ''
+  const [form, setForm] = useState(() => pedidoVazio(unidadeIdPadrao))
 
   function updateItem(idx, field, value) {
     setForm((f) => {
       const itens = [...f.itens]
-      itens[idx] = { ...itens[idx], [field]: field === 'produto' ? value : Number(value) }
+      itens[idx] = { ...itens[idx], [field]: field === 'quantidade' ? Number(value) : value }
       return { ...f, itens }
     })
   }
   function addItem() {
-    setForm((f) => ({ ...f, itens: [...f.itens, novoItem()] }))
+    setForm((f) => ({ ...f, itens: [...f.itens, novoItem(unidadeIdPadrao)] }))
   }
   function removeItem(idx) {
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }))
@@ -31,12 +32,12 @@ export default function NovoPedido({ onCriarPedido, salvando }) {
 
   async function salvar(e) {
     e.preventDefault()
-    if (!form.cliente.trim()) return
-    const itensValidos = form.itens.filter((it) => it.produto.trim() && it.quantidade > 0)
+    if (!form.cliente_id) return
+    const itensValidos = form.itens.filter((it) => it.produto.trim() && it.quantidade > 0 && it.unidade_id)
     if (itensValidos.length === 0) return
 
     await onCriarPedido({ ...form, itens: itensValidos })
-    setForm(pedidoVazio())
+    setForm(pedidoVazio(unidadeIdPadrao))
   }
 
   return (
@@ -48,12 +49,20 @@ export default function NovoPedido({ onCriarPedido, salvando }) {
 
       <div className="row-fields">
         <Field label="Cliente">
-          <input
+          <select
             className="input"
-            value={form.cliente}
-            onChange={(e) => setForm({ ...form, cliente: e.target.value })}
-            placeholder="Nome do cliente"
-          />
+            value={form.cliente_id}
+            onChange={(e) => setForm({ ...form, cliente_id: e.target.value })}
+          >
+            <option value="" disabled>
+              Selecione o cliente
+            </option>
+            {clientes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Data do pedido">
           <input
@@ -95,6 +104,18 @@ export default function NovoPedido({ onCriarPedido, salvando }) {
               onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}
               title="Quantidade"
             />
+            <select
+              className="item-unidade"
+              value={item.unidade_id}
+              onChange={(e) => updateItem(idx, 'unidade_id', e.target.value)}
+              title="Unidade"
+            >
+              {unidades.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nome}
+                </option>
+              ))}
+            </select>
             <button type="button" className="item-remove" onClick={() => removeItem(idx)}>
               <Trash2 size={14} />
             </button>

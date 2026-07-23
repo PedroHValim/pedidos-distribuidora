@@ -256,6 +256,16 @@ code {
   text-align: right;
 }
 
+.item-unidade {
+  border: 1px solid #e0ded5;
+  border-radius: 6px;
+  padding: 6px 4px;
+  font-size: 13px;
+  background: #fff;
+  color: #6b7268;
+  max-width: 92px;
+}
+
 .item-remove {
   border: none;
   background: none;
@@ -538,11 +548,71 @@ code {
   color: #3a3f38;
 }
 
-.pedido-margem {
+.pedido-pagamentos {
+  font-size: 12.5px;
+  color: #2f6f62;
+  background: #eaf2ee;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+}
+
+.entrega-form {
+  border: 1px solid #cfe3d9;
+  background: #f7fbf9;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.entrega-form-label {
   font-size: 12.5px;
   font-weight: 600;
-  color: #2f6f62;
+  color: #3a3f38;
   margin-bottom: 8px;
+}
+
+.entrega-valores {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.entrega-valor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.entrega-valor-input {
+  width: 120px;
+  border: 1px solid #d8d6cc;
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: 14px;
+  text-align: right;
+  background: #fff;
+}
+
+.entrega-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 8px;
+  margin-top: 2px;
+  border-top: 1px dashed #cfe3d9;
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.entrega-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .pedido-obs {
@@ -596,6 +666,54 @@ code {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.filtros-painel {
+  padding: 18px;
+}
+
+.filtros-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.filtros-title {
+  margin: 0;
+}
+
+.filtro-grupo {
+  margin-bottom: 16px;
+}
+
+.filtro-grupo:last-child {
+  margin-bottom: 0;
+}
+
+.filtro-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7268;
+  margin-bottom: 6px;
+}
+
+.filtro-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.filtro-range .input {
+  flex: 1 1 0;
+}
+
+.filtro-range-ate {
+  font-size: 12.5px;
+  color: #8a9089;
+  flex: 0 0 auto;
 }
 
 .stats-row {
@@ -730,8 +848,31 @@ code {
   .input,
   .item-produto,
   .item-qtd,
+  .item-unidade,
   .item-preco-compra,
+  .entrega-valor-input,
   .search-input {
     font-size: 16px;
+  }
+
+  .item-unidade {
+    max-width: none;
+    flex: 1 1 100px;
+  }
+
+  .filtro-range {
+    flex-wrap: wrap;
+  }
+
+  .filtro-range .input {
+    flex: 1 1 100px;
+  }
+
+  .entrega-valor-input {
+    width: 100px;
+  }
+
+  .entrega-form-actions {
+    justify-content: space-between;
   }
 }

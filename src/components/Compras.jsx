@@ -57,7 +57,7 @@ function ItemCompraRow({ item, mediaAnterior, onAtualizarItem }) {
 
       <div className="compra-item-info">
         <div className="compra-item-nome">
-          {item.quantidade}× {item.produto}
+          {item.quantidade} {item.unidade?.nome?.toLowerCase() || ''} × {item.produto}
         </div>
         {precoLocal !== '' && (
           <div className="compra-item-meta">total: {currency(itemCustoTotal({ ...item, preco_compra: Number(precoLocal) }))}</div>
@@ -103,7 +103,7 @@ export default function Compras({ pedidos, onAtualizarItem, onCompletarPedido })
           <div key={pedido.id} className="pedido-card">
             <div className="pedido-top">
               <div>
-                <div className="pedido-cliente">{pedido.cliente}</div>
+                <div className="pedido-cliente">{pedido.cliente?.nome}</div>
                 <div className="pedido-datas">
                   Pedido em {formatData(pedido.data_pedido)}
                   {pedido.data_entrega && ` · entrega ${formatData(pedido.data_entrega)}`}
