@@ -13,37 +13,36 @@ import {
   Legend,
 } from 'recharts'
 import { StatCard, EmptyChart } from './ui.jsx'
-import { currency, STATUS, STATUS_LABEL, STATUS_COLOR, pedidoVendaTotal, pedidoCustoTotal, itemVendaTotal } from '../utils.js'
+import { currency, STATUS, STATUS_LABEL, STATUS_COLOR, pedidoCustoTotal, itemCustoTotal } from '../utils.js'
 
 export default function Painel({ pedidos }) {
   const metrics = useMemo(() => {
     const entregues = pedidos.filter((p) => p.status === 'entregue')
 
-    const receita = entregues.reduce((s, p) => s + pedidoVendaTotal(p), 0)
     const custosConhecidos = entregues.map((p) => pedidoCustoTotal(p)).filter((c) => c != null)
-    const custoTotal = custosConhecidos.reduce((s, c) => s + c, 0)
-    const lucro = receita - custoTotal
-    const ticketMedio = entregues.length ? receita / entregues.length : 0
+    const gastoTotal = custosConhecidos.reduce((s, c) => s + c, 0)
+    const temCustoCompleto = custosConhecidos.length === entregues.length
+    const gastoMedio = custosConhecidos.length ? gastoTotal / custosConhecidos.length : 0
     const emAberto = pedidos.filter((p) => p.status !== 'entregue').length
 
     const porMes = {}
     entregues.forEach((p) => {
       const mes = (p.data_entrega || p.data_pedido || '').slice(0, 7)
       if (!mes) return
-      porMes[mes] = porMes[mes] || { receita: 0, custo: 0, temCusto: true }
-      porMes[mes].receita += pedidoVendaTotal(p)
-      const c = pedidoCustoTotal(p)
-      if (c == null) porMes[mes].temCusto = false
-      else porMes[mes].custo += c
+      const custo = pedidoCustoTotal(p)
+      if (custo == null) return
+      porMes[mes] = (porMes[mes] || 0) + custo
     })
-    const receitaPorMes = Object.entries(porMes)
+    const gastoPorMes = Object.entries(porMes)
       .sort(([a], [b]) => (a < b ? -1 : 1))
-      .map(([mes, v]) => ({ mes, receita: v.receita, lucro: v.temCusto ? v.receita - v.custo : null }))
+      .map(([mes, gasto]) => ({ mes, gasto }))
 
     const porProduto = {}
     entregues.forEach((p) =>
       (p.pedido_itens || []).forEach((it) => {
-        porProduto[it.produto] = (porProduto[it.produto] || 0) + itemVendaTotal(it)
+        const custo = itemCustoTotal(it)
+        if (custo == null) return
+        porProduto[it.produto] = (porProduto[it.produto] || 0) + custo
       })
     )
     const topProdutos = Object.entries(porProduto)
@@ -56,36 +55,44 @@ export default function Painel({ pedidos }) {
       qtd: pedidos.filter((p) => p.status === s).length,
     })).filter((s) => s.qtd > 0)
 
-    return { receita, lucro, temCustoCompleto: custosConhecidos.length === entregues.length, ticketMedio, emAberto, receitaPorMes, topProdutos, statusCount, total: pedidos.length }
+    return {
+      gastoTotal,
+      temCustoCompleto,
+      gastoMedio,
+      emAberto,
+      entreguesCount: entregues.length,
+      gastoPorMes,
+      topProdutos,
+      statusCount,
+      total: pedidos.length,
+    }
   }, [pedidos])
 
   return (
     <div className="painel-grid">
       <div className="stats-row">
-        <StatCard label="Receita entregue" value={currency(metrics.receita)} />
         <StatCard
-          label="Lucro estimado"
-          value={metrics.temCustoCompleto ? currency(metrics.lucro) : `~${currency(metrics.lucro)}`}
-          accent="#2F6F62"
+          label="Total gasto"
+          value={metrics.temCustoCompleto ? currency(metrics.gastoTotal) : `~${currency(metrics.gastoTotal)}`}
+          accent="#C1443A"
         />
-        <StatCard label="Ticket médio" value={currency(metrics.ticketMedio)} />
+        <StatCard label="Gasto médio por pedido" value={currency(metrics.gastoMedio)} />
+        <StatCard label="Pedidos entregues" value={metrics.entreguesCount} />
         <StatCard label="Pedidos em aberto" value={metrics.emAberto} accent="#D98E04" />
       </div>
 
       <div className="chart-card">
-        <h3 className="chart-title">Receita e lucro entregues por mês</h3>
-        {metrics.receitaPorMes.length === 0 ? (
+        <h3 className="chart-title">Gasto por mês</h3>
+        {metrics.gastoPorMes.length === 0 ? (
           <EmptyChart text="Nenhum pedido entregue ainda." />
         ) : (
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={metrics.receitaPorMes} margin={{ left: 8, right: 8 }}>
+            <BarChart data={metrics.gastoPorMes} margin={{ left: 8, right: 8 }}>
               <CartesianGrid stroke="#E6E4DC" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#6B7268' }} axisLine={{ stroke: '#D8D6CC' }} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#6B7268' }} axisLine={false} tickLine={false} width={72} tickFormatter={(v) => currency(v)} />
               <Tooltip formatter={(v) => currency(v)} contentStyle={{ border: '1px solid #E6E4DC', borderRadius: 8, fontSize: 12.5 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="receita" name="Receita" fill="#2F6F62" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              <Bar dataKey="lucro" name="Lucro" fill="#D98E04" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="gasto" name="Gasto" fill="#C1443A" radius={[4, 4, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -93,7 +100,7 @@ export default function Painel({ pedidos }) {
 
       <div className="chart-row">
         <div className="chart-card">
-          <h3 className="chart-title">Produtos mais vendidos</h3>
+          <h3 className="chart-title">Produtos com maior gasto</h3>
           {metrics.topProdutos.length === 0 ? (
             <EmptyChart text="Nenhum pedido entregue ainda." />
           ) : (

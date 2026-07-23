@@ -13,6 +13,7 @@ body {
   font-family: 'Inter', sans-serif;
   background: #f5f6f3;
   color: #1c2321;
+  overflow-x: hidden;
 }
 
 input,
@@ -85,21 +86,32 @@ code {
   background: #eae8e1;
   padding: 4px;
   border-radius: 10px;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
   border: none;
   background: transparent;
-  padding: 8px 14px;
+  padding: 10px 14px;
   border-radius: 7px;
   font-size: 13.5px;
   font-weight: 600;
   color: #6b7268;
   cursor: pointer;
+  min-height: 40px;
 }
 
 .tab-btn-active {
@@ -192,10 +204,6 @@ code {
   font-weight: 600;
 }
 
-.itens-header-total {
-  padding-right: 34px;
-}
-
 .slip {
   border: 1px dashed #d8d6cc;
   border-radius: 10px;
@@ -238,10 +246,8 @@ code {
   font-size: 13px;
 }
 
-.item-preco,
-.item-desc,
 .item-preco-compra {
-  width: 76px;
+  width: 84px;
   border: 1px solid #e0ded5;
   border-radius: 6px;
   padding: 6px;
@@ -250,30 +256,15 @@ code {
   text-align: right;
 }
 
-.item-desc {
-  color: #c1443a;
-}
-
-.item-dots {
-  flex: 1;
-  border-bottom: 1px dotted #d8d6cc;
-  margin-bottom: 4px;
-  min-width: 10px;
-}
-
-.item-total {
-  font-size: 13.5px;
-  min-width: 76px;
-  text-align: right;
-}
-
 .item-remove {
   border: none;
   background: none;
   color: #b7bcb4;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
   display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .add-item-btn {
@@ -287,16 +278,6 @@ code {
   font-size: 13px;
   cursor: pointer;
   padding: 10px 2px 2px;
-}
-
-.slip-total-row {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #e0ded5;
-  font-weight: 700;
-  font-size: 15px;
 }
 
 .form-actions {
@@ -364,8 +345,8 @@ code {
   background: #fff;
   color: #b7bcb4;
   border-radius: 7px;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -672,4 +653,85 @@ code {
   height: 200px;
   color: #b7bcb4;
   font-size: 13px;
+}
+
+/* Celular: uso principal do app, então priorizamos toque e espaço vertical */
+@media (max-width: 640px) {
+  .app {
+    padding: 14px 12px 40px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .title {
+    font-size: 23px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .row-fields {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card {
+    padding: 13px 14px;
+  }
+
+  .stat-value {
+    font-size: 19px;
+  }
+
+  .chart-row {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card {
+    padding: 14px 16px;
+  }
+
+  .pedidos-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-box {
+    flex: 1 1 auto;
+  }
+
+  .pedido-top {
+    flex-wrap: wrap;
+  }
+
+  .pedido-actions {
+    justify-content: space-between;
+  }
+
+  .advance-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 10px 12px;
+  }
+
+  /* impede que o iOS Safari dê zoom automático ao focar um campo */
+  .input,
+  .item-produto,
+  .item-qtd,
+  .item-preco-compra,
+  .search-input {
+    font-size: 16px;
+  }
 }

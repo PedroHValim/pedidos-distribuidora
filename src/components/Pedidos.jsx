@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Package, Search, Truck } from 'lucide-react'
 import { StatusBadge } from './ui.jsx'
-import { currency, formatData, itemVendaTotal, pedidoVendaTotal, pedidoCustoTotal } from '../utils.js'
+import { currency, formatData, pedidoCustoTotal } from '../utils.js'
 
 export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
   const [busca, setBusca] = useState('')
@@ -50,7 +50,6 @@ export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
         <div className="pedidos-list">
           {filtrados.map((p) => {
             const custo = pedidoCustoTotal(p)
-            const venda = pedidoVendaTotal(p)
             return (
               <div key={p.id} className="pedido-card">
                 <div className="pedido-top">
@@ -62,7 +61,7 @@ export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
                     </div>
                   </div>
                   <div className="pedido-top-right">
-                    <div className="pedido-valor mono">{currency(venda)}</div>
+                    {custo != null && <div className="pedido-valor mono">{currency(custo)}</div>}
                     <StatusBadge status={p.status} />
                   </div>
                 </div>
@@ -73,14 +72,9 @@ export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
                       <span>
                         {it.quantidade}× {it.produto}
                       </span>
-                      <span className="mono">{currency(itemVendaTotal(it))}</span>
                     </li>
                   ))}
                 </ul>
-
-                {custo != null && (
-                  <div className="pedido-margem">Margem estimada: {currency(venda - custo)}</div>
-                )}
 
                 {p.obs && <div className="pedido-obs">{p.obs}</div>}
 

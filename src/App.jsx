@@ -63,8 +63,6 @@ export default function App() {
       pedido_id: pedido.id,
       produto: it.produto,
       quantidade: it.quantidade,
-      preco_venda: it.preco_venda,
-      desconto: it.desconto,
     }))
 
     const { error: erroItens } = await supabase.from('pedido_itens').insert(itensParaInserir)

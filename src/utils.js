@@ -26,19 +26,10 @@ export function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-// Total de venda de um item (o que o cliente paga por aquele item)
-export function itemVendaTotal(item) {
-  return Math.max(0, (item.quantidade || 0) * (item.preco_venda || 0) - (item.desconto || 0))
-}
-
 // Total de custo de um item (o que foi pago na compra), null se ainda não comprado
 export function itemCustoTotal(item) {
   if (item.preco_compra == null) return null
   return (item.quantidade || 0) * item.preco_compra
-}
-
-export function pedidoVendaTotal(pedido) {
-  return (pedido.pedido_itens || []).reduce((soma, it) => soma + itemVendaTotal(it), 0)
 }
 
 export function pedidoCustoTotal(pedido) {

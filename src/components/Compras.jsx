@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { PackageCheck, ShoppingCart } from 'lucide-react'
 import { PriceIndicator } from './ui.jsx'
-import { currency, formatData, normalizaProduto } from '../utils.js'
+import { currency, formatData, normalizaProduto, itemCustoTotal } from '../utils.js'
 
 // Calcula a média histórica de preço de compra por produto, a partir de
 // todos os itens já comprados em qualquer pedido (exceto o próprio item).
@@ -59,7 +59,9 @@ function ItemCompraRow({ item, mediaAnterior, onAtualizarItem }) {
         <div className="compra-item-nome">
           {item.quantidade}× {item.produto}
         </div>
-        <div className="compra-item-meta">venda: {currency(item.quantidade * item.preco_venda - item.desconto)}</div>
+        {precoLocal !== '' && (
+          <div className="compra-item-meta">total: {currency(itemCustoTotal({ ...item, preco_compra: Number(precoLocal) }))}</div>
+        )}
       </div>
 
       <input
@@ -67,10 +69,11 @@ function ItemCompraRow({ item, mediaAnterior, onAtualizarItem }) {
         min="0"
         step="0.01"
         className="item-preco-compra"
-        placeholder="preço pago"
+        placeholder="R$/un"
         value={precoLocal}
         onChange={(e) => setPrecoLocal(e.target.value)}
         onBlur={commitPreco}
+        title="Preço pago por unidade"
       />
 
       <PriceIndicator atual={precoLocal === '' ? null : Number(precoLocal)} media={mediaAnterior} />

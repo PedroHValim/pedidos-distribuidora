@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Field } from './ui.jsx'
-import { currency, todayISO, itemVendaTotal } from '../utils.js'
+import { todayISO } from '../utils.js'
 
-const novoItem = () => ({ produto: '', quantidade: 1, preco_venda: 0, desconto: 0 })
+const novoItem = () => ({ produto: '', quantidade: 1 })
 const pedidoVazio = () => ({
   cliente: '',
   data_pedido: todayISO(),
@@ -38,8 +38,6 @@ export default function NovoPedido({ onCriarPedido, salvando }) {
     await onCriarPedido({ ...form, itens: itensValidos })
     setForm(pedidoVazio())
   }
-
-  const totalVenda = form.itens.reduce((s, it) => s + itemVendaTotal(it), 0)
 
   return (
     <form onSubmit={salvar} className="card">
@@ -77,7 +75,6 @@ export default function NovoPedido({ onCriarPedido, salvando }) {
 
       <div className="itens-header">
         <span>Itens do pedido</span>
-        <span className="itens-header-total">Total venda</span>
       </div>
 
       <div className="slip">
@@ -89,6 +86,7 @@ export default function NovoPedido({ onCriarPedido, salvando }) {
               value={item.produto}
               onChange={(e) => updateItem(idx, 'produto', e.target.value)}
             />
+            <span className="item-x">×</span>
             <input
               type="number"
               min="0"
@@ -97,27 +95,6 @@ export default function NovoPedido({ onCriarPedido, salvando }) {
               onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}
               title="Quantidade"
             />
-            <span className="item-x">×</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="item-preco"
-              value={item.preco_venda}
-              onChange={(e) => updateItem(idx, 'preco_venda', e.target.value)}
-              title="Preço de venda (unidade)"
-            />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="item-desc"
-              value={item.desconto}
-              onChange={(e) => updateItem(idx, 'desconto', e.target.value)}
-              title="Desconto (R$)"
-            />
-            <span className="item-dots" />
-            <span className="item-total mono">{currency(itemVendaTotal(item))}</span>
             <button type="button" className="item-remove" onClick={() => removeItem(idx)}>
               <Trash2 size={14} />
             </button>
@@ -126,10 +103,6 @@ export default function NovoPedido({ onCriarPedido, salvando }) {
         <button type="button" className="add-item-btn" onClick={addItem}>
           <Plus size={14} /> Adicionar item
         </button>
-        <div className="slip-total-row">
-          <span>Total do pedido</span>
-          <span className="mono">{currency(totalVenda)}</span>
-        </div>
       </div>
 
       <Field label="Observações (opcional)">
