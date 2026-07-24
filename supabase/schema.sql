@@ -69,31 +69,23 @@ create table pedidos (
   updated_at timestamptz not null default now()
 );
 
--- Itens de cada pedido
+-- Itens de cada pedido. metodo_pagamento_id é como A EMPRESA pagou o
+-- fornecedor por aquele item (controle interno de compra), preenchido
+-- junto com o preço de compra na aba "Compras".
 create table pedido_itens (
   id uuid primary key default gen_random_uuid(),
   pedido_id uuid not null references pedidos(id) on delete cascade,
   produto text not null,
   quantidade numeric not null default 1,
   unidade_id uuid not null references unidades(id),
-  preco_compra numeric,                     -- preço pago por unidade (preenchido na aba "Compras")
+  preco_compra numeric,
+  metodo_pagamento_id uuid references metodos_pagamento(id),
   comprado boolean not null default false,
   created_at timestamptz not null default now()
 );
 
--- Formas de pagamento usadas na entrega de um pedido (pode ter mais de uma)
-create table pedido_pagamentos (
-  id uuid primary key default gen_random_uuid(),
-  pedido_id uuid not null references pedidos(id) on delete cascade,
-  metodo_pagamento_id uuid not null references metodos_pagamento(id),
-  valor numeric not null check (valor > 0),
-  created_at timestamptz not null default now(),
-  unique (pedido_id, metodo_pagamento_id)
-);
-
 create index if not exists idx_pedido_itens_pedido on pedido_itens(pedido_id);
 create index if not exists idx_pedido_itens_produto on pedido_itens (lower(produto));
-create index if not exists idx_pedido_pagamentos_pedido on pedido_pagamentos(pedido_id);
 create index if not exists idx_pedidos_cliente on pedidos(cliente_id);
 
 -- Mantém updated_at em dia
@@ -120,7 +112,6 @@ alter table unidades enable row level security;
 alter table metodos_pagamento enable row level security;
 alter table pedidos enable row level security;
 alter table pedido_itens enable row level security;
-alter table pedido_pagamentos enable row level security;
 
 drop policy if exists "acesso total clientes" on clientes;
 create policy "acesso total clientes" on clientes for all using (true) with check (true);
@@ -136,6 +127,3 @@ create policy "acesso total pedidos" on pedidos for all using (true) with check 
 
 drop policy if exists "acesso total pedido_itens" on pedido_itens;
 create policy "acesso total pedido_itens" on pedido_itens for all using (true) with check (true);
-
-drop policy if exists "acesso total pedido_pagamentos" on pedido_pagamentos;
-create policy "acesso total pedido_pagamentos" on pedido_pagamentos for all using (true) with check (true);

@@ -14,7 +14,8 @@ function TabButton({ icon, label, active, onClick }) {
   )
 }
 
-const PEDIDO_SELECT = '*, cliente:clientes(id,nome), pedido_itens(*, unidade:unidades(id,nome)), pedido_pagamentos(*, metodo_pagamento:metodos_pagamento(id,nome))'
+const PEDIDO_SELECT =
+  '*, cliente:clientes(id,nome), pedido_itens(*, unidade:unidades(id,nome), metodo_pagamento:metodos_pagamento(id,nome))'
 
 export default function App() {
   const [pedidos, setPedidos] = useState([])
@@ -111,23 +112,10 @@ export default function App() {
     await fetchPedidos()
   }
 
-  // Conclui a entrega: grava as formas de pagamento usadas e avança o status.
-  // pagamentos: [{ metodo_pagamento_id, valor }, ...] — pelo menos um item, valor > 0
-  async function concluirEntrega(pedidoId, pagamentos) {
-    const linhas = pagamentos.map((p) => ({
-      pedido_id: pedidoId,
-      metodo_pagamento_id: p.metodo_pagamento_id,
-      valor: p.valor,
-    }))
-
-    const { error: erroPagamentos } = await supabase.from('pedido_pagamentos').insert(linhas)
-    if (erroPagamentos) {
-      setErro(erroPagamentos.message)
-      return
-    }
-
-    const { error: erroStatus } = await supabase.from('pedidos').update({ status: 'entregue' }).eq('id', pedidoId)
-    if (erroStatus) setErro(erroStatus.message)
+  async function avancarStatus(pedido) {
+    const proximo = pedido.status === 'separado' ? 'entregue' : pedido.status
+    const { error } = await supabase.from('pedidos').update({ status: proximo }).eq('id', pedido.id)
+    if (error) setErro(error.message)
     else setErro('')
     await fetchPedidos()
   }
@@ -192,15 +180,15 @@ export default function App() {
           <NovoPedido onCriarPedido={criarPedido} salvando={salvando} clientes={clientes} unidades={unidades} />
         )}
         {tab === 'compras' && (
-          <Compras pedidos={pedidos} onAtualizarItem={atualizarItem} onCompletarPedido={completarPedido} />
-        )}
-        {tab === 'pedidos' && (
-          <Pedidos
+          <Compras
             pedidos={pedidos}
             metodosPagamento={metodosPagamento}
-            onConcluirEntrega={concluirEntrega}
-            onExcluirPedido={excluirPedido}
+            onAtualizarItem={atualizarItem}
+            onCompletarPedido={completarPedido}
           />
+        )}
+        {tab === 'pedidos' && (
+          <Pedidos pedidos={pedidos} onAvancarStatus={avancarStatus} onExcluirPedido={excluirPedido} />
         )}
         {tab === 'painel' && <Painel pedidos={pedidos} clientes={clientes} metodosPagamento={metodosPagamento} />}
       </main>

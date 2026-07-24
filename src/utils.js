@@ -38,13 +38,6 @@ export function pedidoCustoTotal(pedido) {
   return itens.reduce((soma, it) => soma + itemCustoTotal(it), 0)
 }
 
-// Soma de tudo que foi pago pelo cliente na entrega (todas as formas de pagamento), null se ainda não entregue
-export function pedidoValorPago(pedido) {
-  const pagamentos = pedido.pedido_pagamentos || []
-  if (!pagamentos.length) return null
-  return pagamentos.reduce((soma, p) => soma + Number(p.valor || 0), 0)
-}
-
 export function normalizaProduto(nome) {
   return (nome || '').trim().toLowerCase()
 }

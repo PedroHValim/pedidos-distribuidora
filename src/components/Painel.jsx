@@ -13,15 +13,7 @@ import {
   Legend,
 } from 'recharts'
 import { StatCard, EmptyChart } from './ui.jsx'
-import {
-  currency,
-  STATUS,
-  STATUS_LABEL,
-  STATUS_COLOR,
-  pedidoCustoTotal,
-  pedidoValorPago,
-  itemCustoTotal,
-} from '../utils.js'
+import { currency, STATUS, STATUS_LABEL, STATUS_COLOR, pedidoCustoTotal, itemCustoTotal } from '../utils.js'
 
 const METODO_COLORS = ['#2F6F62', '#D98E04', '#3B82C4', '#8A5FBF', '#C1443A', '#B58A1E']
 
@@ -100,13 +92,15 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
       return true
     })
 
+    // Formas de pagamento e faixa de valor só fazem sentido para pedidos já
+    // entregues (custo completo e conhecido).
     const entreguesFiltrados = baseFiltrados.filter((p) => {
       if (p.status !== 'entregue') return false
-      const recebido = pedidoValorPago(p)
-      if (valorDe && (recebido == null || recebido < Number(valorDe))) return false
-      if (valorAte && (recebido == null || recebido > Number(valorAte))) return false
+      const custo = pedidoCustoTotal(p)
+      if (valorDe && (custo == null || custo < Number(valorDe))) return false
+      if (valorAte && (custo == null || custo > Number(valorAte))) return false
       if (metodosSelecionados.length > 0) {
-        const metodosDoPedido = (p.pedido_pagamentos || []).map((pg) => pg.metodo_pagamento_id)
+        const metodosDoPedido = (p.pedido_itens || []).map((it) => it.metodo_pagamento_id).filter(Boolean)
         if (!metodosSelecionados.some((id) => metodosDoPedido.includes(id))) return false
       }
       return true
@@ -115,11 +109,7 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
     const custosConhecidos = entreguesFiltrados.map((p) => pedidoCustoTotal(p)).filter((c) => c != null)
     const gastoTotal = custosConhecidos.reduce((s, c) => s + c, 0)
     const temCustoCompleto = custosConhecidos.length === entreguesFiltrados.length
-
-    const recebidos = entreguesFiltrados.map((p) => pedidoValorPago(p)).filter((v) => v != null)
-    const recebidoTotal = recebidos.reduce((s, v) => s + v, 0)
-    const saldo = recebidoTotal - gastoTotal
-    const ticketMedio = recebidos.length ? recebidoTotal / recebidos.length : 0
+    const gastoMedio = custosConhecidos.length ? gastoTotal / custosConhecidos.length : 0
 
     const emAberto = baseFiltrados.filter((p) => p.status !== 'entregue').length
 
@@ -127,15 +117,13 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
     entreguesFiltrados.forEach((p) => {
       const mes = dateRef(p).slice(0, 7)
       if (!mes) return
-      porMes[mes] = porMes[mes] || { gasto: 0, recebido: 0 }
       const c = pedidoCustoTotal(p)
-      if (c != null) porMes[mes].gasto += c
-      const r = pedidoValorPago(p)
-      if (r != null) porMes[mes].recebido += r
+      if (c == null) return
+      porMes[mes] = (porMes[mes] || 0) + c
     })
-    const porMesArr = Object.entries(porMes)
+    const gastoPorMes = Object.entries(porMes)
       .sort(([a], [b]) => (a < b ? -1 : 1))
-      .map(([mes, v]) => ({ mes, gasto: v.gasto, recebido: v.recebido }))
+      .map(([mes, gasto]) => ({ mes, gasto }))
 
     const porProduto = {}
     entreguesFiltrados.forEach((p) =>
@@ -152,9 +140,11 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
 
     const porMetodo = {}
     entreguesFiltrados.forEach((p) =>
-      (p.pedido_pagamentos || []).forEach((pg) => {
-        const nome = pg.metodo_pagamento?.nome || 'Outro'
-        porMetodo[nome] = (porMetodo[nome] || 0) + Number(pg.valor || 0)
+      (p.pedido_itens || []).forEach((it) => {
+        const c = itemCustoTotal(it)
+        if (c == null) return
+        const nome = it.metodo_pagamento?.nome || 'Não informado'
+        porMetodo[nome] = (porMetodo[nome] || 0) + c
       })
     )
     const porMetodoArr = Object.entries(porMetodo)
@@ -169,12 +159,10 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
     return {
       gastoTotal,
       temCustoCompleto,
-      recebidoTotal,
-      saldo,
-      ticketMedio,
+      gastoMedio,
       emAberto,
       entreguesCount: entreguesFiltrados.length,
-      porMesArr,
+      gastoPorMes,
       topProdutos,
       porMetodoArr,
       statusCount,
@@ -229,7 +217,7 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
         </div>
 
         <div className="filtro-grupo">
-          <span className="filtro-label">Valor recebido (R$)</span>
+          <span className="filtro-label">Gasto do pedido (R$)</span>
           <div className="filtro-range">
             <input
               type="number"
@@ -252,7 +240,7 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
         </div>
 
         <div className="filtro-grupo">
-          <span className="filtro-label">Forma de pagamento</span>
+          <span className="filtro-label">Forma de pagamento (compra)</span>
           <div className="filter-chips">
             {metodosPagamento.map((m) => (
               <button
@@ -268,31 +256,27 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
       </div>
 
       <div className="stats-row">
-        <StatCard label="Total recebido" value={currency(metrics.recebidoTotal)} accent="#2F6F62" />
         <StatCard
           label="Total gasto"
           value={metrics.temCustoCompleto ? currency(metrics.gastoTotal) : `~${currency(metrics.gastoTotal)}`}
           accent="#C1443A"
         />
-        <StatCard label="Saldo" value={currency(metrics.saldo)} accent={metrics.saldo >= 0 ? '#2F6F62' : '#C1443A'} />
-        <StatCard label="Ticket médio" value={currency(metrics.ticketMedio)} />
+        <StatCard label="Gasto médio por pedido" value={currency(metrics.gastoMedio)} />
         <StatCard label="Pedidos entregues" value={metrics.entreguesCount} />
         <StatCard label="Pedidos em aberto" value={metrics.emAberto} accent="#D98E04" />
       </div>
 
       <div className="chart-card">
-        <h3 className="chart-title">Recebido x Gasto por mês</h3>
-        {metrics.porMesArr.length === 0 ? (
+        <h3 className="chart-title">Gasto por mês</h3>
+        {metrics.gastoPorMes.length === 0 ? (
           <EmptyChart text="Nenhum pedido entregue no período filtrado." />
         ) : (
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={metrics.porMesArr} margin={{ left: 8, right: 8 }}>
+            <BarChart data={metrics.gastoPorMes} margin={{ left: 8, right: 8 }}>
               <CartesianGrid stroke="#E6E4DC" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#6B7268' }} axisLine={{ stroke: '#D8D6CC' }} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#6B7268' }} axisLine={false} tickLine={false} width={72} tickFormatter={(v) => currency(v)} />
               <Tooltip formatter={(v) => currency(v)} contentStyle={{ border: '1px solid #E6E4DC', borderRadius: 8, fontSize: 12.5 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="recebido" name="Recebido" fill="#2F6F62" radius={[4, 4, 0, 0]} maxBarSize={40} />
               <Bar dataKey="gasto" name="Gasto" fill="#C1443A" radius={[4, 4, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
@@ -318,7 +302,7 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
         </div>
 
         <div className="chart-card">
-          <h3 className="chart-title">Recebido por forma de pagamento</h3>
+          <h3 className="chart-title">Gasto por forma de pagamento</h3>
           {metrics.porMetodoArr.length === 0 ? (
             <EmptyChart text="Nenhum pedido entregue no período filtrado." />
           ) : (

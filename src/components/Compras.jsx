@@ -25,8 +25,9 @@ function useMediaHistorica(todosPedidos) {
   }, [todosPedidos])
 }
 
-function ItemCompraRow({ item, mediaAnterior, onAtualizarItem }) {
+function ItemCompraRow({ item, mediaAnterior, metodosPagamento, onAtualizarItem }) {
   const [precoLocal, setPrecoLocal] = useState(item.preco_compra ?? '')
+  const [metodoLocal, setMetodoLocal] = useState(item.metodo_pagamento_id ?? '')
 
   function commitPreco() {
     const valor = precoLocal === '' ? null : Number(precoLocal)
@@ -35,12 +36,18 @@ function ItemCompraRow({ item, mediaAnterior, onAtualizarItem }) {
     }
   }
 
+  function commitMetodo(valor) {
+    setMetodoLocal(valor)
+    onAtualizarItem(item.id, { metodo_pagamento_id: valor || null })
+  }
+
+  const faltaInfo = precoLocal === '' || precoLocal == null || !metodoLocal
+
   function toggleComprado() {
     const proximo = !item.comprado
-    const patch = { comprado: proximo }
-    // marcar como comprado sem preço não faz sentido: exige preço já preenchido
-    if (proximo && (precoLocal === '' || precoLocal == null)) return
-    onAtualizarItem(item.id, patch)
+    // marcar como comprado exige preço e forma de pagamento já preenchidos
+    if (proximo && faltaInfo) return
+    onAtualizarItem(item.id, { comprado: proximo })
   }
 
   return (
@@ -50,7 +57,7 @@ function ItemCompraRow({ item, mediaAnterior, onAtualizarItem }) {
         className="check-btn"
         onClick={toggleComprado}
         aria-label={item.comprado ? 'Desmarcar como comprado' : 'Marcar como comprado'}
-        title={precoLocal === '' ? 'Informe o preço pago antes de marcar como comprado' : undefined}
+        title={faltaInfo ? 'Informe o preço e a forma de pagamento antes de marcar como comprado' : undefined}
       >
         <PackageCheck size={16} />
       </button>
@@ -76,12 +83,26 @@ function ItemCompraRow({ item, mediaAnterior, onAtualizarItem }) {
         title="Preço pago por unidade"
       />
 
+      <select
+        className="item-metodo-compra"
+        value={metodoLocal}
+        onChange={(e) => commitMetodo(e.target.value)}
+        title="Como a empresa pagou este item"
+      >
+        <option value="">Forma pgto.</option>
+        {metodosPagamento.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.nome}
+          </option>
+        ))}
+      </select>
+
       <PriceIndicator atual={precoLocal === '' ? null : Number(precoLocal)} media={mediaAnterior} />
     </div>
   )
 }
 
-export default function Compras({ pedidos, onAtualizarItem, onCompletarPedido }) {
+export default function Compras({ pedidos, metodosPagamento, onAtualizarItem, onCompletarPedido }) {
   const pedidosComprando = pedidos.filter((p) => p.status === 'comprando')
   const mediaHistorica = useMediaHistorica(pedidos)
 
@@ -120,6 +141,7 @@ export default function Compras({ pedidos, onAtualizarItem, onCompletarPedido })
                   key={item.id}
                   item={item}
                   mediaAnterior={mediaHistorica(item.produto, item.id)}
+                  metodosPagamento={metodosPagamento}
                   onAtualizarItem={onAtualizarItem}
                 />
               ))}
