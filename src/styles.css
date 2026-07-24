@@ -338,6 +338,27 @@ code {
   height: fit-content;
 }
 
+.edit-pedido-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  color: #6b7268;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.edit-pedido-form {
+  border: 1px solid #d8d6cc;
+  background: #fbfbf9;
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 4px;
+}
+
 .compra-itens {
   display: flex;
   flex-direction: column;

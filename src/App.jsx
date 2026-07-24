@@ -24,6 +24,7 @@ export default function App() {
   const [metodosPagamento, setMetodosPagamento] = useState([])
   const [loading, setLoading] = useState(true)
   const [salvando, setSalvando] = useState(false)
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [erro, setErro] = useState('')
   const [tab, setTab] = useState('novo')
 
@@ -105,6 +106,79 @@ export default function App() {
     await fetchPedidos()
   }
 
+  // Edita cliente/datas/obs/itens de um pedido ainda em "comprando".
+  // Se um item já comprado tiver produto/quantidade/unidade alterados, o
+  // preço e a forma de pagamento registrados deixam de valer e são limpos.
+  async function editarPedido(pedidoId, form) {
+    setSalvandoEdicao(true)
+
+    const { error: erroPedido } = await supabase
+      .from('pedidos')
+      .update({
+        cliente_id: form.cliente_id,
+        data_pedido: form.data_pedido,
+        data_entrega: form.data_entrega || null,
+        obs: form.obs || null,
+      })
+      .eq('id', pedidoId)
+
+    if (erroPedido) {
+      setErro(erroPedido.message)
+      setSalvandoEdicao(false)
+      return
+    }
+
+    const original = pedidos.find((p) => p.id === pedidoId)
+    const itensOriginais = original?.pedido_itens || []
+    const idsNoForm = new Set(form.itens.filter((it) => it.id).map((it) => it.id))
+    const idsRemovidos = itensOriginais.filter((it) => !idsNoForm.has(it.id)).map((it) => it.id)
+    const itensNovos = form.itens.filter((it) => !it.id)
+    const itensExistentes = form.itens.filter((it) => it.id)
+
+    const operacoes = []
+
+    if (idsRemovidos.length) {
+      operacoes.push(supabase.from('pedido_itens').delete().in('id', idsRemovidos))
+    }
+
+    if (itensNovos.length) {
+      operacoes.push(
+        supabase.from('pedido_itens').insert(
+          itensNovos.map((it) => ({
+            pedido_id: pedidoId,
+            produto: it.produto,
+            quantidade: it.quantidade,
+            unidade_id: it.unidade_id,
+          }))
+        )
+      )
+    }
+
+    for (const it of itensExistentes) {
+      const itemOriginal = itensOriginais.find((o) => o.id === it.id)
+      const mudou =
+        itemOriginal.produto !== it.produto ||
+        Number(itemOriginal.quantidade) !== Number(it.quantidade) ||
+        itemOriginal.unidade_id !== it.unidade_id
+
+      const patch = { produto: it.produto, quantidade: it.quantidade, unidade_id: it.unidade_id }
+      if (mudou && itemOriginal.comprado) {
+        patch.comprado = false
+        patch.preco_compra = null
+        patch.metodo_pagamento_id = null
+      }
+      operacoes.push(supabase.from('pedido_itens').update(patch).eq('id', it.id))
+    }
+
+    const resultados = await Promise.all(operacoes)
+    const erroOperacao = resultados.find((r) => r.error)?.error
+    if (erroOperacao) setErro(erroOperacao.message)
+    else setErro('')
+
+    await fetchPedidos()
+    setSalvandoEdicao(false)
+  }
+
   async function completarPedido(pedidoId) {
     const { error } = await supabase.from('pedidos').update({ status: 'separado' }).eq('id', pedidoId)
     if (error) setErro(error.message)
@@ -182,9 +256,13 @@ export default function App() {
         {tab === 'compras' && (
           <Compras
             pedidos={pedidos}
+            clientes={clientes}
+            unidades={unidades}
             metodosPagamento={metodosPagamento}
+            salvandoEdicao={salvandoEdicao}
             onAtualizarItem={atualizarItem}
             onCompletarPedido={completarPedido}
+            onEditarPedido={editarPedido}
           />
         )}
         {tab === 'pedidos' && (
