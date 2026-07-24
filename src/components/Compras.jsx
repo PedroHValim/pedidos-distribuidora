@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { PackageCheck, Pencil, ShoppingCart, Trash2, Plus } from 'lucide-react'
 import { Field, PriceIndicator } from './ui.jsx'
 import { currency, formatData, normalizaProduto, itemCustoTotal } from '../utils.js'
@@ -115,6 +115,10 @@ function EditarPedidoForm({ pedido, clientes, unidades, salvando, onSalvar, onCa
       unidade_id: it.unidade_id || it.unidade?.id || '',
     })),
   }))
+  // guarda síncrona contra duplo toque (o `disabled` do botão só reflete no
+  // próximo render; sem isso, um segundo toque rápido reenvia o mesmo item
+  // "novo" — sem id — e ele acaba sendo inserido duas vezes)
+  const enviandoRef = useRef(false)
 
   function updateItem(idx, field, value) {
     setForm((f) => {
@@ -132,10 +136,17 @@ function EditarPedidoForm({ pedido, clientes, unidades, salvando, onSalvar, onCa
 
   async function salvar(e) {
     e.preventDefault()
+    if (enviandoRef.current) return
     if (!form.cliente_id) return
     const itensValidos = form.itens.filter((it) => it.produto.trim() && it.quantidade > 0 && it.unidade_id)
     if (itensValidos.length === 0) return
-    await onSalvar({ ...form, itens: itensValidos })
+
+    enviandoRef.current = true
+    try {
+      await onSalvar({ ...form, itens: itensValidos })
+    } finally {
+      enviandoRef.current = false
+    }
   }
 
   return (

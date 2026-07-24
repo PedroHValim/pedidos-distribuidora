@@ -341,14 +341,16 @@ code {
 .edit-pedido-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
-  border: none;
-  background: none;
-  color: #6b7268;
-  font-weight: 600;
+  gap: 6px;
+  border: 1px solid #d8d6cc;
+  background: #fff;
+  color: #1c2321;
+  font-weight: 700;
   font-size: 12.5px;
+  border-radius: 7px;
+  padding: 7px 12px;
+  min-height: 34px;
   cursor: pointer;
-  padding: 4px 2px;
 }
 
 .edit-pedido-form {

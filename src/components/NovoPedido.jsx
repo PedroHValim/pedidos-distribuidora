@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Field } from './ui.jsx'
 import { todayISO } from '../utils.js'
@@ -15,6 +15,10 @@ const pedidoVazio = (unidadeIdPadrao) => ({
 export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades }) {
   const unidadeIdPadrao = unidades[0]?.id || ''
   const [form, setForm] = useState(() => pedidoVazio(unidadeIdPadrao))
+  // guarda síncrona: o estado `salvando` do App só chega no próximo render,
+  // então um duplo toque rápido no botão passa pelo `disabled` antes dele
+  // atualizar. Essa ref bloqueia o segundo envio na hora, sem esperar o React.
+  const enviandoRef = useRef(false)
 
   function updateItem(idx, field, value) {
     setForm((f) => {
@@ -32,12 +36,18 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
 
   async function salvar(e) {
     e.preventDefault()
+    if (enviandoRef.current) return
     if (!form.cliente_id) return
     const itensValidos = form.itens.filter((it) => it.produto.trim() && it.quantidade > 0 && it.unidade_id)
     if (itensValidos.length === 0) return
 
-    await onCriarPedido({ ...form, itens: itensValidos })
-    setForm(pedidoVazio(unidadeIdPadrao))
+    enviandoRef.current = true
+    try {
+      await onCriarPedido({ ...form, itens: itensValidos })
+      setForm(pedidoVazio(unidadeIdPadrao))
+    } finally {
+      enviandoRef.current = false
+    }
   }
 
   return (
