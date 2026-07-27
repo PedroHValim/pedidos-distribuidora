@@ -53,7 +53,8 @@ insert into metodos_pagamento (nome) values
   ('Crédito'),
   ('Débito'),
   ('Pix'),
-  ('Dinheiro')
+  ('Dinheiro'),
+  ('Boleto')
 on conflict (nome) do nothing;
 
 -- Pedidos (um por cliente/entrega) -------------------------------------------

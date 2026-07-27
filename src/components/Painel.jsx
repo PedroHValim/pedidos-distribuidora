@@ -1,19 +1,7 @@
 import { useMemo, useState } from 'react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { StatCard, EmptyChart } from './ui.jsx'
-import { currency, STATUS, STATUS_LABEL, STATUS_COLOR, pedidoCustoTotal, itemCustoTotal } from '../utils.js'
+import { currency, pedidoCustoTotal, itemCustoTotal } from '../utils.js'
 
 const METODO_COLORS = ['#2F6F62', '#D98E04', '#3B82C4', '#8A5FBF', '#C1443A', '#B58A1E']
 
@@ -151,11 +139,6 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
       .map(([metodo, total]) => ({ metodo, total }))
       .sort((a, b) => b.total - a.total)
 
-    const statusCount = STATUS.map((s) => ({
-      status: s,
-      qtd: baseFiltrados.filter((p) => p.status === s).length,
-    })).filter((s) => s.qtd > 0)
-
     return {
       gastoTotal,
       temCustoCompleto,
@@ -165,7 +148,6 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
       gastoPorMes,
       topProdutos,
       porMetodoArr,
-      statusCount,
     }
   }, [pedidos, clienteId, dataDe, dataAte, valorDe, valorAte, metodosSelecionados])
 
@@ -321,32 +303,6 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
             </ResponsiveContainer>
           )}
         </div>
-      </div>
-
-      <div className="chart-card">
-        <h3 className="chart-title">Pedidos por status</h3>
-        {metrics.statusCount.length === 0 ? (
-          <EmptyChart text="Sem pedidos no período filtrado." />
-        ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie data={metrics.statusCount} dataKey="qtd" nameKey="status" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2}>
-                {metrics.statusCount.map((s) => (
-                  <Cell key={s.status} fill={STATUS_COLOR[s.status]} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(v, n, entry) => [v, STATUS_LABEL[entry.payload.status]]}
-                contentStyle={{ border: '1px solid #E6E4DC', borderRadius: 8, fontSize: 12.5 }}
-              />
-              <Legend
-                iconType="circle"
-                formatter={(value, entry) => STATUS_LABEL[entry.payload.status] || value}
-                wrapperStyle={{ fontSize: 12, color: '#6B7268' }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
       </div>
     </div>
   )
