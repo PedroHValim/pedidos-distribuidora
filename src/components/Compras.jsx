@@ -123,12 +123,12 @@ function EditarPedidoForm({ pedido, clientes, unidades, salvando, onSalvar, onCa
   function updateItem(idx, field, value) {
     setForm((f) => {
       const itens = [...f.itens]
-      itens[idx] = { ...itens[idx], [field]: field === 'quantidade' ? Number(value) : value }
+      itens[idx] = { ...itens[idx], [field]: value }
       return { ...f, itens }
     })
   }
   function addItem() {
-    setForm((f) => ({ ...f, itens: [...f.itens, { produto: '', quantidade: 1, unidade_id: unidades[0]?.id || '' }] }))
+    setForm((f) => ({ ...f, itens: [...f.itens, { produto: '', quantidade: '', unidade_id: unidades[0]?.id || '' }] }))
   }
   function removeItem(idx) {
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }))
@@ -138,7 +138,9 @@ function EditarPedidoForm({ pedido, clientes, unidades, salvando, onSalvar, onCa
     e.preventDefault()
     if (enviandoRef.current) return
     if (!form.cliente_id) return
-    const itensValidos = form.itens.filter((it) => it.produto.trim() && it.quantidade > 0 && it.unidade_id)
+    const itensValidos = form.itens
+      .filter((it) => it.produto.trim() && Number(it.quantidade) > 0 && it.unidade_id)
+      .map((it) => ({ ...it, quantidade: Number(it.quantidade) }))
     if (itensValidos.length === 0) return
 
     enviandoRef.current = true
@@ -203,6 +205,9 @@ function EditarPedidoForm({ pedido, clientes, unidades, salvando, onSalvar, onCa
             <input
               type="number"
               min="0"
+              step="0.01"
+              inputMode="decimal"
+              placeholder="Qtd"
               className="item-qtd"
               value={item.quantidade}
               onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}

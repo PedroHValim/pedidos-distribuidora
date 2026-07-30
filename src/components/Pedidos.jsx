@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Package, Search, Truck } from 'lucide-react'
 import { StatusBadge } from './ui.jsx'
-import { currency, formatData, pedidoCustoTotal } from '../utils.js'
+import { currency, formatData, pedidoCustoTotal, itemCustoTotal } from '../utils.js'
 
 export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
   const [busca, setBusca] = useState('')
@@ -72,6 +72,9 @@ export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
                       <span>
                         {it.quantidade} {it.unidade?.nome?.toLowerCase()} × {it.produto}
                       </span>
+                      {it.preco_compra != null && (
+                        <span className="mono">{currency(itemCustoTotal(it))}</span>
+                      )}
                     </li>
                   ))}
                 </ul>

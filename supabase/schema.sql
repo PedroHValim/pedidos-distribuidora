@@ -38,7 +38,8 @@ insert into clientes (nome) values
   ('SAPORE'),
   ('CAFÉ TRÊS CORAÇÕES'),
   ('BRADESCO GUARULHOS'),
-  ('BRADESCO CONGONHAS')
+  ('BRADESCO CONGONHAS'),
+  ('DESPESAS DIVERSAS')
 on conflict (nome) do nothing;
 
 insert into unidades (nome) values
@@ -46,7 +47,8 @@ insert into unidades (nome) values
   ('KILO'),
   ('PACOTES'),
   ('CAIXAS'),
-  ('SACOS')
+  ('SACOS'),
+  ('FARDOS')
 on conflict (nome) do nothing;
 
 insert into metodos_pagamento (nome) values

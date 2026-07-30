@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Field } from './ui.jsx'
 import { todayISO } from '../utils.js'
 
-const novoItem = (unidadeIdPadrao) => ({ produto: '', quantidade: 1, unidade_id: unidadeIdPadrao || '' })
+const novoItem = (unidadeIdPadrao) => ({ produto: '', quantidade: '', unidade_id: unidadeIdPadrao || '' })
 const pedidoVazio = (unidadeIdPadrao) => ({
   cliente_id: '',
   data_pedido: todayISO(),
@@ -23,7 +23,7 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
   function updateItem(idx, field, value) {
     setForm((f) => {
       const itens = [...f.itens]
-      itens[idx] = { ...itens[idx], [field]: field === 'quantidade' ? Number(value) : value }
+      itens[idx] = { ...itens[idx], [field]: value }
       return { ...f, itens }
     })
   }
@@ -38,7 +38,9 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
     e.preventDefault()
     if (enviandoRef.current) return
     if (!form.cliente_id) return
-    const itensValidos = form.itens.filter((it) => it.produto.trim() && it.quantidade > 0 && it.unidade_id)
+    const itensValidos = form.itens
+      .filter((it) => it.produto.trim() && Number(it.quantidade) > 0 && it.unidade_id)
+      .map((it) => ({ ...it, quantidade: Number(it.quantidade) }))
     if (itensValidos.length === 0) return
 
     enviandoRef.current = true
@@ -109,6 +111,9 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
             <input
               type="number"
               min="0"
+              step="0.01"
+              inputMode="decimal"
+              placeholder="Qtd"
               className="item-qtd"
               value={item.quantidade}
               onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}

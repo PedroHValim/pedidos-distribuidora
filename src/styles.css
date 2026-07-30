@@ -14,12 +14,18 @@ body {
   background: #f5f6f3;
   color: #1c2321;
   overflow-x: hidden;
+  /* pedido do time: tudo em maiúscula pra ficar mais fácil de ler no celular */
+  text-transform: uppercase;
 }
 
 input,
 select,
+option,
 button {
   font-family: 'Inter', sans-serif;
+  /* navegadores resetam text-transform em campos de formulário por padrão,
+     então herdar do body (maiúsculas) não é suficiente aqui */
+  text-transform: uppercase;
 }
 
 input:focus,
@@ -232,7 +238,7 @@ code {
 }
 
 .item-qtd {
-  width: 52px;
+  width: 64px;
   border: 1px solid #e0ded5;
   border-radius: 6px;
   padding: 6px;
