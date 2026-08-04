@@ -1,5 +1,5 @@
-import { CheckCircle2, Circle, Truck, ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
-import { STATUS_COLOR, STATUS_LABEL, currency } from '../utils.js'
+import { CheckCircle2, Circle, Truck, ArrowDownRight, ArrowUpRight, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { STATUS_COLOR, STATUS_LABEL, currency, nomeMes, mesAtual } from '../utils.js'
 
 export function StatusBadge({ status }) {
   const Icon = status === 'entregue' ? CheckCircle2 : status === 'separado' ? Truck : Circle
@@ -33,6 +33,31 @@ export function StatCard({ label, value, accent }) {
 
 export function EmptyChart({ text }) {
   return <div className="empty-chart">{text}</div>
+}
+
+// Navegador de mês: sempre abre no mês atual, com setas pra ver meses anteriores.
+export function MonthNavigator({ ano, mes, onNavegar, onMesAtual }) {
+  const atual = mesAtual()
+  const ehMesAtual = ano === atual.ano && mes === atual.mes
+
+  return (
+    <div className="month-nav">
+      <button type="button" className="month-nav-btn" onClick={() => onNavegar(-1)} aria-label="Mês anterior">
+        <ChevronLeft size={16} />
+      </button>
+      <span className="month-nav-label">
+        {nomeMes(mes)} de {ano}
+      </span>
+      <button type="button" className="month-nav-btn" onClick={() => onNavegar(1)} aria-label="Próximo mês">
+        <ChevronRight size={16} />
+      </button>
+      {!ehMesAtual && (
+        <button type="button" className="text-btn month-nav-hoje" onClick={onMesAtual}>
+          Mês atual
+        </button>
+      )}
+    </div>
+  )
 }
 
 // Compara o preço pago agora com a média histórica do mesmo produto.

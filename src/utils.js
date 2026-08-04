@@ -41,3 +41,36 @@ export function pedidoCustoTotal(pedido) {
 export function normalizaProduto(nome) {
   return (nome || '').trim().toLowerCase()
 }
+
+const NOMES_MES = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+]
+
+export function nomeMes(mes) {
+  return NOMES_MES[mes - 1] || ''
+}
+
+// { ano, mes } do mês atual — mes vai de 1 a 12
+export function mesAtual() {
+  const d = new Date()
+  return { ano: d.getFullYear(), mes: d.getMonth() + 1 }
+}
+
+export function somarMeses({ ano, mes }, delta) {
+  const d = new Date(ano, mes - 1 + delta, 1)
+  return { ano: d.getFullYear(), mes: d.getMonth() + 1 }
+}
+
+export function primeiroDiaDoMes({ ano, mes }) {
+  return new Date(ano, mes - 1, 1).toISOString().slice(0, 10)
+}
+
+export function ultimoDiaDoMes({ ano, mes }) {
+  return new Date(ano, mes, 0).toISOString().slice(0, 10)
+}
+
+// "2026-07" — pra comparar direto com o começo de uma data ISO (data.slice(0,7))
+export function mesRefISO({ ano, mes }) {
+  return `${ano}-${String(mes).padStart(2, '0')}`
+}

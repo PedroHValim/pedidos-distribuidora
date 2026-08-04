@@ -1,23 +1,42 @@
 import { useMemo, useState } from 'react'
 import { Package, Search, Truck } from 'lucide-react'
-import { StatusBadge } from './ui.jsx'
-import { currency, formatData, pedidoCustoTotal, itemCustoTotal } from '../utils.js'
+import { StatusBadge, MonthNavigator } from './ui.jsx'
+import { currency, formatData, pedidoCustoTotal, itemCustoTotal, mesAtual, somarMeses, mesRefISO } from '../utils.js'
 
 export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState('Todos')
+  const [mesNav, setMesNav] = useState(() => mesAtual())
+
+  function irParaMes(delta) {
+    setMesNav((atual) => somarMeses(atual, delta))
+  }
+  function irParaMesAtual() {
+    setMesNav(mesAtual())
+  }
 
   const lista = pedidos.filter((p) => p.status === 'separado' || p.status === 'entregue')
+  const mesRef = mesRefISO(mesNav)
 
   const filtrados = useMemo(() => {
     return lista
       .filter((p) => filtro === 'Todos' || (filtro === 'Separado' ? p.status === 'separado' : p.status === 'entregue'))
       .filter((p) => (p.cliente?.nome || '').toLowerCase().includes(busca.toLowerCase()))
+      // pedido separado (ainda não entregue) continua aparecendo até ser
+      // resolvido, não importa o mês selecionado — só o histórico de
+      // entregues é filtrado pelo mês em navegação
+      .filter((p) => {
+        if (p.status !== 'entregue') return true
+        const ref = p.data_entrega || p.data_pedido || ''
+        return ref.slice(0, 7) === mesRef
+      })
       .sort((a, b) => ((a.data_entrega || '') < (b.data_entrega || '') ? -1 : 1))
-  }, [lista, busca, filtro])
+  }, [lista, busca, filtro, mesRef])
 
   return (
     <div className="card">
+      <MonthNavigator ano={mesNav.ano} mes={mesNav.mes} onNavegar={irParaMes} onMesAtual={irParaMesAtual} />
+
       <div className="pedidos-toolbar">
         <div className="search-box">
           <Search size={15} color="#8A9089" />

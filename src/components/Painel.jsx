@@ -1,7 +1,15 @@
 import { useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { StatCard, EmptyChart } from './ui.jsx'
-import { currency, pedidoCustoTotal, itemCustoTotal } from '../utils.js'
+import { StatCard, EmptyChart, MonthNavigator } from './ui.jsx'
+import {
+  currency,
+  pedidoCustoTotal,
+  itemCustoTotal,
+  mesAtual,
+  somarMeses,
+  primeiroDiaDoMes,
+  ultimoDiaDoMes,
+} from '../utils.js'
 
 const METODO_COLORS = ['#2F6F62', '#D98E04', '#3B82C4', '#8A5FBF', '#C1443A', '#B58A1E']
 
@@ -15,16 +23,12 @@ function diasAtras(n) {
   return d.toISOString().slice(0, 10)
 }
 
-function inicioDoMes() {
-  const d = new Date()
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
-}
-
 export default function Painel({ pedidos, clientes, metodosPagamento }) {
   const [clienteId, setClienteId] = useState('')
-  const [presetPeriodo, setPresetPeriodo] = useState('tudo')
-  const [dataDe, setDataDe] = useState('')
-  const [dataAte, setDataAte] = useState('')
+  const [mesNav, setMesNav] = useState(() => mesAtual())
+  const [presetPeriodo, setPresetPeriodo] = useState('mes')
+  const [dataDe, setDataDe] = useState(() => primeiroDiaDoMes(mesAtual()))
+  const [dataAte, setDataAte] = useState(() => ultimoDiaDoMes(mesAtual()))
   const [valorDe, setValorDe] = useState('')
   const [valorAte, setValorAte] = useState('')
   const [metodosSelecionados, setMetodosSelecionados] = useState([])
@@ -40,10 +44,25 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
     } else if (preset === '30d') {
       setDataDe(diasAtras(30))
       setDataAte(hoje())
-    } else if (preset === 'mes') {
-      setDataDe(inicioDoMes())
-      setDataAte(hoje())
     }
+  }
+
+  function irParaMes(delta) {
+    setMesNav((atual) => {
+      const novo = somarMeses(atual, delta)
+      setPresetPeriodo('mes')
+      setDataDe(primeiroDiaDoMes(novo))
+      setDataAte(ultimoDiaDoMes(novo))
+      return novo
+    })
+  }
+
+  function irParaMesAtual() {
+    const novo = mesAtual()
+    setMesNav(novo)
+    setPresetPeriodo('mes')
+    setDataDe(primeiroDiaDoMes(novo))
+    setDataAte(ultimoDiaDoMes(novo))
   }
 
   function onDataManual(campo, valor) {
@@ -58,19 +77,23 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
 
   function limparFiltros() {
     setClienteId('')
-    setPresetPeriodo('tudo')
-    setDataDe('')
-    setDataAte('')
+    irParaMesAtual()
     setValorDe('')
     setValorAte('')
     setMetodosSelecionados([])
   }
 
-  const temFiltroAtivo =
-    clienteId || dataDe || dataAte || valorDe || valorAte || metodosSelecionados.length > 0
+  const temFiltroAtivo = clienteId || presetPeriodo !== 'mes' || valorDe || valorAte || metodosSelecionados.length > 0
 
   const metrics = useMemo(() => {
     const dateRef = (p) => p.data_entrega || p.data_pedido || ''
+
+    // "Pedidos em aberto" não deve sumir por causa do mês selecionado — um
+    // pedido pendente continua pendente até ser resolvido, então só filtra por cliente.
+    const abertosDoCliente = pedidos.filter((p) => {
+      if (clienteId && p.cliente?.id !== clienteId) return false
+      return p.status !== 'entregue'
+    })
 
     const baseFiltrados = pedidos.filter((p) => {
       if (clienteId && p.cliente?.id !== clienteId) return false
@@ -99,7 +122,7 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
     const temCustoCompleto = custosConhecidos.length === entreguesFiltrados.length
     const gastoMedio = custosConhecidos.length ? gastoTotal / custosConhecidos.length : 0
 
-    const emAberto = baseFiltrados.filter((p) => p.status !== 'entregue').length
+    const emAberto = abertosDoCliente.length
 
     const porMes = {}
     entreguesFiltrados.forEach((p) => {
@@ -177,6 +200,7 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
 
         <div className="filtro-grupo">
           <span className="filtro-label">Período</span>
+          <MonthNavigator ano={mesNav.ano} mes={mesNav.mes} onNavegar={irParaMes} onMesAtual={irParaMesAtual} />
           <div className="filter-chips">
             <button className={`chip ${presetPeriodo === 'tudo' ? 'chip-active' : ''}`} onClick={() => aplicarPreset('tudo')}>
               Tudo
@@ -186,9 +210,6 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
             </button>
             <button className={`chip ${presetPeriodo === '30d' ? 'chip-active' : ''}`} onClick={() => aplicarPreset('30d')}>
               Últimos 30 dias
-            </button>
-            <button className={`chip ${presetPeriodo === 'mes' ? 'chip-active' : ''}`} onClick={() => aplicarPreset('mes')}>
-              Este mês
             </button>
           </div>
           <div className="filtro-range">

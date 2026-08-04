@@ -462,6 +462,43 @@ code {
   margin-bottom: 18px;
 }
 
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f5f6f3;
+  border: 1px solid #e6e4dc;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.month-nav-btn {
+  border: 1px solid #d8d6cc;
+  background: #fff;
+  color: #3a3f38;
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.month-nav-label {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #1c2321;
+}
+
+.month-nav-hoje {
+  flex-shrink: 0;
+}
+
 .search-box {
   display: flex;
   align-items: center;
