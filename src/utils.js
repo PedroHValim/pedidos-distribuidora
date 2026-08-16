@@ -38,8 +38,16 @@ export function pedidoCustoTotal(pedido) {
   return itens.reduce((soma, it) => soma + itemCustoTotal(it), 0)
 }
 
+// Normaliza pra comparar nomes de produto: ignora maiúscula/minúscula,
+// acento (peça = peca) e espaços extras. Só usado pra comparar — o nome
+// digitado continua sendo salvo do jeito que a pessoa escreveu.
 export function normalizaProduto(nome) {
-  return (nome || '').trim().toLowerCase()
+  return (nome || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
 }
 
 const NOMES_MES = [
