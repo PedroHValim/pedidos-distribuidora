@@ -30,6 +30,18 @@ create table if not exists metodos_pagamento (
   created_at timestamptz not null default now()
 );
 
+-- Produtos: diferente das outras listas fixas, esta cresce sozinha — toda
+-- vez que alguém digita um produto que ainda não existe aqui, o app cadastra
+-- automaticamente, pra virar sugestão de autocompletar da próxima vez.
+create table if not exists produtos (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  ativo boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists idx_produtos_nome_lower on produtos (lower(nome));
+
 insert into clientes (nome) values
   ('BTG'),
   ('W PREMIUM GUARULHOS'),
@@ -113,6 +125,7 @@ create trigger trg_pedidos_updated_at
 alter table clientes enable row level security;
 alter table unidades enable row level security;
 alter table metodos_pagamento enable row level security;
+alter table produtos enable row level security;
 alter table pedidos enable row level security;
 alter table pedido_itens enable row level security;
 
@@ -124,6 +137,9 @@ create policy "acesso total unidades" on unidades for all using (true) with chec
 
 drop policy if exists "acesso total metodos_pagamento" on metodos_pagamento;
 create policy "acesso total metodos_pagamento" on metodos_pagamento for all using (true) with check (true);
+
+drop policy if exists "acesso total produtos" on produtos;
+create policy "acesso total produtos" on produtos for all using (true) with check (true);
 
 drop policy if exists "acesso total pedidos" on pedidos;
 create policy "acesso total pedidos" on pedidos for all using (true) with check (true);

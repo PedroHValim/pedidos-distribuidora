@@ -1,5 +1,6 @@
-import { CheckCircle2, Circle, Truck, ArrowDownRight, ArrowUpRight, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
-import { STATUS_COLOR, STATUS_LABEL, currency, nomeMes, mesAtual } from '../utils.js'
+import { useMemo, useState } from 'react'
+import { CheckCircle2, Circle, Truck, ChevronLeft, ChevronRight } from 'lucide-react'
+import { STATUS_COLOR, STATUS_LABEL, nomeMes, mesAtual, normalizaProduto } from '../utils.js'
 
 export function StatusBadge({ status }) {
   const Icon = status === 'entregue' ? CheckCircle2 : status === 'separado' ? Truck : Circle
@@ -60,32 +61,51 @@ export function MonthNavigator({ ano, mes, onNavegar, onMesAtual }) {
   )
 }
 
-// Compara o preço pago agora com a média histórica do mesmo produto.
-// bom = abaixo da média · médio = até 10% acima · ruim = mais de 10% acima
-export function PriceIndicator({ atual, media }) {
-  if (media == null || atual == null || atual <= 0) return null
-  const diff = (atual - media) / media
+// Campo de produto com autocompletar: sugere produtos já cadastrados
+// enquanto a pessoa digita. Se ela digitar um nome novo, o produto entra
+// pra lista automaticamente ao salvar o pedido (isso acontece em App.jsx,
+// aqui é só a digitação + sugestão).
+export function ProdutoAutocomplete({ value, onChange, produtos, className, placeholder, title }) {
+  const [aberto, setAberto] = useState(false)
 
-  let estado = 'medio'
-  let Icon = Minus
-  let color = '#B58A1E'
-  if (atual < media) {
-    estado = 'bom'
-    Icon = ArrowDownRight
-    color = '#3B7A57'
-  } else if (diff > 0.1) {
-    estado = 'ruim'
-    Icon = ArrowUpRight
-    color = '#C1443A'
-  }
-
-  const label = estado === 'bom' ? 'abaixo da média' : estado === 'ruim' ? 'acima da média' : 'na média'
-  const sinal = diff > 0 ? '+' : ''
+  const sugestoes = useMemo(() => {
+    const termo = normalizaProduto(value)
+    if (!termo) return []
+    return produtos.filter((p) => normalizaProduto(p.nome).includes(termo)).slice(0, 6)
+  }, [value, produtos])
 
   return (
-    <span className="price-indicator" style={{ color }} title={`Média histórica: ${currency(media)}`}>
-      <Icon size={14} /> {label} ({sinal}
-      {(diff * 100).toFixed(0)}%)
-    </span>
+    <div className="produto-autocomplete">
+      <input
+        className={className}
+        placeholder={placeholder}
+        title={title}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value)
+          setAberto(true)
+        }}
+        onFocus={() => setAberto(true)}
+        onBlur={() => setTimeout(() => setAberto(false), 150)}
+      />
+      {aberto && sugestoes.length > 0 && (
+        <ul className="produto-sugestoes">
+          {sugestoes.map((p) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(p.nome)
+                  setAberto(false)
+                }}
+              >
+                {p.nome}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

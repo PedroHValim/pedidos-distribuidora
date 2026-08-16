@@ -1,18 +1,35 @@
 import { useMemo, useState } from 'react'
-import { Package, Search, Truck } from 'lucide-react'
+import { Package, Pencil, Search, Truck } from 'lucide-react'
 import { StatusBadge, MonthNavigator } from './ui.jsx'
+import EditarPedidoForm from './EditarPedidoForm.jsx'
 import { currency, formatData, pedidoCustoTotal, itemCustoTotal, mesAtual, somarMeses, mesRefISO } from '../utils.js'
 
-export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
+export default function Pedidos({
+  pedidos,
+  clientes,
+  unidades,
+  metodosPagamento,
+  produtos,
+  salvandoEdicao,
+  onAvancarStatus,
+  onExcluirPedido,
+  onEditarPedido,
+}) {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState('Todos')
   const [mesNav, setMesNav] = useState(() => mesAtual())
+  const [editandoId, setEditandoId] = useState(null)
 
   function irParaMes(delta) {
     setMesNav((atual) => somarMeses(atual, delta))
   }
   function irParaMesAtual() {
     setMesNav(mesAtual())
+  }
+
+  async function salvarEdicao(pedidoId, form) {
+    await onEditarPedido(pedidoId, form)
+    setEditandoId(null)
   }
 
   const lista = pedidos.filter((p) => p.status === 'separado' || p.status === 'entregue')
@@ -69,6 +86,7 @@ export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
         <div className="pedidos-list">
           {filtrados.map((p) => {
             const custo = pedidoCustoTotal(p)
+            const editando = editandoId === p.id
             return (
               <div key={p.id} className="pedido-card">
                 <div className="pedido-top">
@@ -79,37 +97,57 @@ export default function Pedidos({ pedidos, onAvancarStatus, onExcluirPedido }) {
                       {p.data_entrega && ` · entrega ${formatData(p.data_entrega)}`}
                     </div>
                   </div>
-                  <div className="pedido-top-right">
-                    {custo != null && <div className="pedido-valor mono">{currency(custo)}</div>}
-                    <StatusBadge status={p.status} />
-                  </div>
-                </div>
-
-                <ul className="pedido-itens">
-                  {(p.pedido_itens || []).map((it) => (
-                    <li key={it.id} className="pedido-item-line">
-                      <span>
-                        {it.quantidade} {it.unidade?.nome?.toLowerCase()} × {it.produto}
-                      </span>
-                      {it.preco_compra != null && (
-                        <span className="mono">{currency(itemCustoTotal(it))}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-
-                {p.obs && <div className="pedido-obs">{p.obs}</div>}
-
-                <div className="pedido-actions">
-                  {p.status === 'separado' && (
-                    <button className="advance-btn" onClick={() => onAvancarStatus(p)}>
-                      <Truck size={13} /> Marcar como Entregue
-                    </button>
+                  {!editando && (
+                    <div className="pedido-top-right">
+                      {custo != null && <div className="pedido-valor mono">{currency(custo)}</div>}
+                      <StatusBadge status={p.status} />
+                    </div>
                   )}
-                  <button className="text-btn danger" onClick={() => onExcluirPedido(p.id)}>
-                    Excluir
-                  </button>
                 </div>
+
+                {editando ? (
+                  <EditarPedidoForm
+                    pedido={p}
+                    clientes={clientes}
+                    unidades={unidades}
+                    metodosPagamento={metodosPagamento}
+                    produtos={produtos}
+                    salvando={salvandoEdicao}
+                    onSalvar={(form) => salvarEdicao(p.id, form)}
+                    onCancelar={() => setEditandoId(null)}
+                  />
+                ) : (
+                  <>
+                    <ul className="pedido-itens">
+                      {(p.pedido_itens || []).map((it) => (
+                        <li key={it.id} className="pedido-item-line">
+                          <span>
+                            {it.quantidade} {it.unidade?.nome?.toLowerCase()} × {it.produto}
+                          </span>
+                          {it.preco_compra != null && (
+                            <span className="mono">{currency(itemCustoTotal(it))}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+
+                    {p.obs && <div className="pedido-obs">{p.obs}</div>}
+
+                    <div className="pedido-actions">
+                      {p.status === 'separado' && (
+                        <button className="advance-btn" onClick={() => onAvancarStatus(p)}>
+                          <Truck size={13} /> Marcar como Entregue
+                        </button>
+                      )}
+                      <button type="button" className="edit-pedido-btn" onClick={() => setEditandoId(p.id)}>
+                        <Pencil size={13} /> Editar
+                      </button>
+                      <button className="text-btn danger" onClick={() => onExcluirPedido(p.id)}>
+                        Excluir
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )
           })}

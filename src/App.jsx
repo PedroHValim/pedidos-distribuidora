@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle } from 'lucide-react'
 import { supabase, supabaseConfigurado } from './supabaseClient.js'
+import { normalizaProduto } from './utils.js'
 import NovoPedido from './components/NovoPedido.jsx'
 import Compras from './components/Compras.jsx'
 import Pedidos from './components/Pedidos.jsx'
@@ -22,6 +23,7 @@ export default function App() {
   const [clientes, setClientes] = useState([])
   const [unidades, setUnidades] = useState([])
   const [metodosPagamento, setMetodosPagamento] = useState([])
+  const [produtos, setProdutos] = useState([])
   const [loading, setLoading] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
@@ -42,10 +44,11 @@ export default function App() {
   }
 
   async function fetchListasFixas() {
-    const [clientesRes, unidadesRes, metodosRes] = await Promise.all([
+    const [clientesRes, unidadesRes, metodosRes, produtosRes] = await Promise.all([
       supabase.from('clientes').select('*').eq('ativo', true).order('nome'),
       supabase.from('unidades').select('*').eq('ativo', true).order('nome'),
       supabase.from('metodos_pagamento').select('*').eq('ativo', true).order('nome'),
+      supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
     ])
     if (clientesRes.error) setErro(clientesRes.error.message)
     else setClientes(clientesRes.data || [])
@@ -55,6 +58,30 @@ export default function App() {
 
     if (metodosRes.error) setErro(metodosRes.error.message)
     else setMetodosPagamento(metodosRes.data || [])
+
+    if (produtosRes.error) setErro(produtosRes.error.message)
+    else setProdutos(produtosRes.data || [])
+  }
+
+  // Cadastra automaticamente produtos digitados que ainda não existem na
+  // lista (comparando sem diferenciar maiúsculas/minúsculas), pra virarem
+  // sugestão de autocompletar da próxima vez. Isso é um "bônus" da gravação
+  // do pedido — se falhar, não deve travar nem assustar com o banner de erro.
+  async function registrarProdutosNovos(nomes, produtosConhecidos) {
+    const conhecidos = new Set(produtosConhecidos.map((p) => normalizaProduto(p.nome)))
+    const novos = [...new Set(nomes.map((n) => n.trim()).filter(Boolean))].filter(
+      (nome) => !conhecidos.has(normalizaProduto(nome))
+    )
+    if (novos.length === 0) return
+
+    const { data, error } = await supabase
+      .from('produtos')
+      .insert(novos.map((nome) => ({ nome })))
+      .select()
+
+    if (!error && data) setProdutos((prev) => [...prev, ...data])
+    // erro aqui normalmente é só uma corrida de digitação (alguém cadastrou
+    // o mesmo produto ao mesmo tempo) — não vale a pena mostrar pro usuário
   }
 
   useEffect(() => {
@@ -93,6 +120,7 @@ export default function App() {
     else {
       setErro('')
       setTab('compras')
+      await registrarProdutosNovos(form.itens.map((it) => it.produto), produtos)
     }
 
     await fetchPedidos()
@@ -106,9 +134,20 @@ export default function App() {
     await fetchPedidos()
   }
 
-  // Edita cliente/datas/obs/itens de um pedido ainda em "comprando".
-  // Se um item já comprado tiver produto/quantidade/unidade alterados, o
-  // preço e a forma de pagamento registrados deixam de valer e são limpos.
+  async function excluirItem(itemId) {
+    const { error } = await supabase.from('pedido_itens').delete().eq('id', itemId)
+    if (error) setErro(error.message)
+    else setErro('')
+    await fetchPedidos()
+  }
+
+  // Edita cliente/datas/obs/itens de um pedido em qualquer status. Preço e
+  // forma de pagamento de cada item também são editáveis aqui — mudar um
+  // preço reflete em tudo que depende dele (Pedidos, Painel) porque esses
+  // valores são sempre lidos direto do banco, não guardados em outro lugar.
+  // Um item só continua marcado como "comprado" se, depois da edição, ainda
+  // tiver preço E forma de pagamento preenchidos — se algum dos dois for
+  // apagado, o item volta a precisar ser comprado de novo.
   async function editarPedido(pedidoId, form) {
     setSalvandoEdicao(true)
 
@@ -149,6 +188,8 @@ export default function App() {
             produto: it.produto,
             quantidade: it.quantidade,
             unidade_id: it.unidade_id,
+            preco_compra: it.preco_compra,
+            metodo_pagamento_id: it.metodo_pagamento_id,
           }))
         )
       )
@@ -156,16 +197,15 @@ export default function App() {
 
     for (const it of itensExistentes) {
       const itemOriginal = itensOriginais.find((o) => o.id === it.id)
-      const mudou =
-        itemOriginal.produto !== it.produto ||
-        Number(itemOriginal.quantidade) !== Number(it.quantidade) ||
-        itemOriginal.unidade_id !== it.unidade_id
+      const compradoFinal = itemOriginal.comprado && it.preco_compra != null && it.metodo_pagamento_id != null
 
-      const patch = { produto: it.produto, quantidade: it.quantidade, unidade_id: it.unidade_id }
-      if (mudou && itemOriginal.comprado) {
-        patch.comprado = false
-        patch.preco_compra = null
-        patch.metodo_pagamento_id = null
+      const patch = {
+        produto: it.produto,
+        quantidade: it.quantidade,
+        unidade_id: it.unidade_id,
+        preco_compra: it.preco_compra,
+        metodo_pagamento_id: it.metodo_pagamento_id,
+        comprado: compradoFinal,
       }
       operacoes.push(supabase.from('pedido_itens').update(patch).eq('id', it.id))
     }
@@ -173,7 +213,10 @@ export default function App() {
     const resultados = await Promise.all(operacoes)
     const erroOperacao = resultados.find((r) => r.error)?.error
     if (erroOperacao) setErro(erroOperacao.message)
-    else setErro('')
+    else {
+      setErro('')
+      await registrarProdutosNovos(form.itens.map((it) => it.produto), produtos)
+    }
 
     await fetchPedidos()
     setSalvandoEdicao(false)
@@ -251,7 +294,13 @@ export default function App() {
 
       <main className="main">
         {tab === 'novo' && (
-          <NovoPedido onCriarPedido={criarPedido} salvando={salvando} clientes={clientes} unidades={unidades} />
+          <NovoPedido
+            onCriarPedido={criarPedido}
+            salvando={salvando}
+            clientes={clientes}
+            unidades={unidades}
+            produtos={produtos}
+          />
         )}
         {tab === 'compras' && (
           <Compras
@@ -259,14 +308,26 @@ export default function App() {
             clientes={clientes}
             unidades={unidades}
             metodosPagamento={metodosPagamento}
+            produtos={produtos}
             salvandoEdicao={salvandoEdicao}
             onAtualizarItem={atualizarItem}
+            onExcluirItem={excluirItem}
             onCompletarPedido={completarPedido}
             onEditarPedido={editarPedido}
           />
         )}
         {tab === 'pedidos' && (
-          <Pedidos pedidos={pedidos} onAvancarStatus={avancarStatus} onExcluirPedido={excluirPedido} />
+          <Pedidos
+            pedidos={pedidos}
+            clientes={clientes}
+            unidades={unidades}
+            metodosPagamento={metodosPagamento}
+            produtos={produtos}
+            salvandoEdicao={salvandoEdicao}
+            onAvancarStatus={avancarStatus}
+            onExcluirPedido={excluirPedido}
+            onEditarPedido={editarPedido}
+          />
         )}
         {tab === 'painel' && <Painel pedidos={pedidos} clientes={clientes} metodosPagamento={metodosPagamento} />}
       </main>

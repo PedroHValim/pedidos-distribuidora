@@ -1,11 +1,12 @@
-import { useMemo, useRef, useState } from 'react'
-import { PackageCheck, Pencil, ShoppingCart, Trash2, Plus } from 'lucide-react'
-import { Field, PriceIndicator } from './ui.jsx'
+import { useMemo, useState } from 'react'
+import { PackageCheck, Pencil, ShoppingCart, Trash2 } from 'lucide-react'
+import EditarPedidoForm from './EditarPedidoForm.jsx'
 import { currency, formatData, normalizaProduto, itemCustoTotal } from '../utils.js'
 
-// Calcula a média histórica de preço de compra por produto, a partir de
-// todos os itens já comprados em qualquer pedido (exceto o próprio item).
-function useMediaHistorica(todosPedidos) {
+// Estatísticas de preço pago historicamente por produto (menor preço, preço
+// médio e quantas vezes já foi comprado), a partir de todos os itens já
+// comprados em qualquer pedido (exceto o próprio item sendo editado agora).
+function useEstatisticasPreco(todosPedidos) {
   return useMemo(() => {
     const todosItens = todosPedidos.flatMap((p) => p.pedido_itens || [])
     return (produto, excluirItemId) => {
@@ -20,12 +21,16 @@ function useMediaHistorica(todosPedidos) {
         )
         .map((it) => it.preco_compra)
       if (!valores.length) return null
-      return valores.reduce((a, b) => a + b, 0) / valores.length
+      return {
+        minimo: Math.min(...valores),
+        media: valores.reduce((a, b) => a + b, 0) / valores.length,
+        qtd: valores.length,
+      }
     }
   }, [todosPedidos])
 }
 
-function ItemCompraRow({ item, mediaAnterior, metodosPagamento, onAtualizarItem }) {
+function ItemCompraRow({ item, estatisticas, metodosPagamento, podeExcluir, onAtualizarItem, onExcluirItem }) {
   const [precoLocal, setPrecoLocal] = useState(item.preco_compra ?? '')
   const [metodoLocal, setMetodoLocal] = useState(item.metodo_pagamento_id ?? '')
 
@@ -66,6 +71,11 @@ function ItemCompraRow({ item, mediaAnterior, metodosPagamento, onAtualizarItem 
         <div className="compra-item-nome">
           {item.quantidade} {item.unidade?.nome?.toLowerCase() || ''} × {item.produto}
         </div>
+        {estatisticas && (
+          <div className="compra-item-historico">
+            {estatisticas.qtd}× antes · mín {currency(estatisticas.minimo)} · média {currency(estatisticas.media)}
+          </div>
+        )}
         {precoLocal !== '' && (
           <div className="compra-item-meta">total: {currency(itemCustoTotal({ ...item, preco_compra: Number(precoLocal) }))}</div>
         )}
@@ -97,162 +107,17 @@ function ItemCompraRow({ item, mediaAnterior, metodosPagamento, onAtualizarItem 
         ))}
       </select>
 
-      <PriceIndicator atual={precoLocal === '' ? null : Number(precoLocal)} media={mediaAnterior} />
+      <button
+        type="button"
+        className="item-excluir-compra"
+        onClick={() => podeExcluir && onExcluirItem(item.id)}
+        disabled={!podeExcluir}
+        title={podeExcluir ? 'Excluir item' : 'Use "Editar" pra excluir o último item do pedido'}
+        aria-label="Excluir item"
+      >
+        <Trash2 size={14} />
+      </button>
     </div>
-  )
-}
-
-function EditarPedidoForm({ pedido, clientes, unidades, salvando, onSalvar, onCancelar }) {
-  const [form, setForm] = useState(() => ({
-    cliente_id: pedido.cliente?.id || '',
-    data_pedido: pedido.data_pedido || '',
-    data_entrega: pedido.data_entrega || '',
-    obs: pedido.obs || '',
-    itens: (pedido.pedido_itens || []).map((it) => ({
-      id: it.id,
-      produto: it.produto,
-      quantidade: it.quantidade,
-      unidade_id: it.unidade_id || it.unidade?.id || '',
-    })),
-  }))
-  // guarda síncrona contra duplo toque (o `disabled` do botão só reflete no
-  // próximo render; sem isso, um segundo toque rápido reenvia o mesmo item
-  // "novo" — sem id — e ele acaba sendo inserido duas vezes)
-  const enviandoRef = useRef(false)
-
-  function updateItem(idx, field, value) {
-    setForm((f) => {
-      const itens = [...f.itens]
-      itens[idx] = { ...itens[idx], [field]: value }
-      return { ...f, itens }
-    })
-  }
-  function addItem() {
-    setForm((f) => ({ ...f, itens: [...f.itens, { produto: '', quantidade: '', unidade_id: unidades[0]?.id || '' }] }))
-  }
-  function removeItem(idx) {
-    setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }))
-  }
-
-  async function salvar(e) {
-    e.preventDefault()
-    if (enviandoRef.current) return
-    if (!form.cliente_id) return
-    const itensValidos = form.itens
-      .filter((it) => it.produto.trim() && Number(it.quantidade) > 0 && it.unidade_id)
-      .map((it) => ({ ...it, quantidade: Number(it.quantidade) }))
-    if (itensValidos.length === 0) return
-
-    enviandoRef.current = true
-    try {
-      await onSalvar({ ...form, itens: itensValidos })
-    } finally {
-      enviandoRef.current = false
-    }
-  }
-
-  return (
-    <form onSubmit={salvar} className="edit-pedido-form">
-      <div className="row-fields">
-        <Field label="Cliente">
-          <select
-            className="input"
-            value={form.cliente_id}
-            onChange={(e) => setForm({ ...form, cliente_id: e.target.value })}
-          >
-            <option value="" disabled>
-              Selecione o cliente
-            </option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Data do pedido">
-          <input
-            type="date"
-            className="input"
-            value={form.data_pedido}
-            onChange={(e) => setForm({ ...form, data_pedido: e.target.value })}
-          />
-        </Field>
-        <Field label="Previsão de entrega">
-          <input
-            type="date"
-            className="input"
-            value={form.data_entrega}
-            onChange={(e) => setForm({ ...form, data_entrega: e.target.value })}
-          />
-        </Field>
-      </div>
-
-      <div className="itens-header">
-        <span>Itens do pedido</span>
-      </div>
-
-      <div className="slip">
-        {form.itens.map((item, idx) => (
-          <div key={item.id ?? `novo-${idx}`} className="item-row">
-            <input
-              className="item-produto"
-              placeholder="Produto"
-              value={item.produto}
-              onChange={(e) => updateItem(idx, 'produto', e.target.value)}
-            />
-            <span className="item-x">×</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              inputMode="decimal"
-              placeholder="Qtd"
-              className="item-qtd"
-              value={item.quantidade}
-              onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}
-              title="Quantidade"
-            />
-            <select
-              className="item-unidade"
-              value={item.unidade_id}
-              onChange={(e) => updateItem(idx, 'unidade_id', e.target.value)}
-              title="Unidade"
-            >
-              {unidades.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nome}
-                </option>
-              ))}
-            </select>
-            <button type="button" className="item-remove" onClick={() => removeItem(idx)}>
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-        <button type="button" className="add-item-btn" onClick={addItem}>
-          <Plus size={14} /> Adicionar item
-        </button>
-      </div>
-
-      <Field label="Observações (opcional)">
-        <input
-          className="input"
-          value={form.obs}
-          onChange={(e) => setForm({ ...form, obs: e.target.value })}
-          placeholder="Ex: entregar pela manhã"
-        />
-      </Field>
-
-      <div className="form-actions">
-        <button type="button" className="text-btn" onClick={onCancelar}>
-          Cancelar
-        </button>
-        <button type="submit" className="primary-btn" disabled={salvando}>
-          {salvando ? 'Salvando…' : 'Salvar alterações'}
-        </button>
-      </div>
-    </form>
   )
 }
 
@@ -261,14 +126,16 @@ export default function Compras({
   clientes,
   unidades,
   metodosPagamento,
+  produtos,
   salvandoEdicao,
   onAtualizarItem,
+  onExcluirItem,
   onCompletarPedido,
   onEditarPedido,
 }) {
   const [editandoId, setEditandoId] = useState(null)
   const pedidosComprando = pedidos.filter((p) => p.status === 'comprando')
-  const mediaHistorica = useMediaHistorica(pedidos)
+  const estatisticasPreco = useEstatisticasPreco(pedidos)
 
   async function salvarEdicao(pedidoId, form) {
     await onEditarPedido(pedidoId, form)
@@ -318,6 +185,8 @@ export default function Compras({
                 pedido={pedido}
                 clientes={clientes}
                 unidades={unidades}
+                metodosPagamento={metodosPagamento}
+                produtos={produtos}
                 salvando={salvandoEdicao}
                 onSalvar={(form) => salvarEdicao(pedido.id, form)}
                 onCancelar={() => setEditandoId(null)}
@@ -329,9 +198,11 @@ export default function Compras({
                     <ItemCompraRow
                       key={item.id}
                       item={item}
-                      mediaAnterior={mediaHistorica(item.produto, item.id)}
+                      estatisticas={estatisticasPreco(item.produto, item.id)}
                       metodosPagamento={metodosPagamento}
+                      podeExcluir={itens.length > 1}
                       onAtualizarItem={onAtualizarItem}
+                      onExcluirItem={onExcluirItem}
                     />
                   ))}
                 </div>

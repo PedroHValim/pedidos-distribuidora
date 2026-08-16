@@ -1,23 +1,31 @@
 import { useRef, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Field, ProdutoAutocomplete } from './ui.jsx'
-import { todayISO } from '../utils.js'
 
-const novoItem = (unidadeIdPadrao) => ({ produto: '', quantidade: '', unidade_id: unidadeIdPadrao || '' })
-const pedidoVazio = (unidadeIdPadrao) => ({
-  cliente_id: '',
-  data_pedido: todayISO(),
-  data_entrega: '',
-  obs: '',
-  itens: [novoItem(unidadeIdPadrao)],
-})
-
-export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades, produtos }) {
-  const unidadeIdPadrao = unidades[0]?.id || ''
-  const [form, setForm] = useState(() => pedidoVazio(unidadeIdPadrao))
-  // guarda síncrona: o estado `salvando` do App só chega no próximo render,
-  // então um duplo toque rápido no botão passa pelo `disabled` antes dele
-  // atualizar. Essa ref bloqueia o segundo envio na hora, sem esperar o React.
+// Formulário de edição de um pedido já criado — cliente, datas, observação e
+// itens (produto, quantidade, unidade, preço pago e forma de pagamento).
+// Usado tanto na aba Compras (pedido ainda "comprando") quanto na aba
+// Pedidos (pedido "separado" ou "entregue"): editar o preço de um item aqui
+// atualiza o custo em qualquer lugar que dependa dele (Pedidos, Painel),
+// porque tudo é calculado a partir do preco_compra salvo no banco.
+export default function EditarPedidoForm({ pedido, clientes, unidades, metodosPagamento, produtos, salvando, onSalvar, onCancelar }) {
+  const [form, setForm] = useState(() => ({
+    cliente_id: pedido.cliente?.id || '',
+    data_pedido: pedido.data_pedido || '',
+    data_entrega: pedido.data_entrega || '',
+    obs: pedido.obs || '',
+    itens: (pedido.pedido_itens || []).map((it) => ({
+      id: it.id,
+      produto: it.produto,
+      quantidade: it.quantidade,
+      unidade_id: it.unidade_id || it.unidade?.id || '',
+      preco_compra: it.preco_compra ?? '',
+      metodo_pagamento_id: it.metodo_pagamento_id || '',
+    })),
+  }))
+  // guarda síncrona contra duplo toque (o `disabled` do botão só reflete no
+  // próximo render; sem isso, um segundo toque rápido reenvia o mesmo item
+  // "novo" — sem id — e ele acaba sendo inserido duas vezes)
   const enviandoRef = useRef(false)
 
   function updateItem(idx, field, value) {
@@ -28,7 +36,10 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
     })
   }
   function addItem() {
-    setForm((f) => ({ ...f, itens: [...f.itens, novoItem(unidadeIdPadrao)] }))
+    setForm((f) => ({
+      ...f,
+      itens: [...f.itens, { produto: '', quantidade: '', unidade_id: unidades[0]?.id || '', preco_compra: '', metodo_pagamento_id: '' }],
+    }))
   }
   function removeItem(idx) {
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }))
@@ -40,25 +51,24 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
     if (!form.cliente_id) return
     const itensValidos = form.itens
       .filter((it) => it.produto.trim() && Number(it.quantidade) > 0 && it.unidade_id)
-      .map((it) => ({ ...it, quantidade: Number(it.quantidade) }))
+      .map((it) => ({
+        ...it,
+        quantidade: Number(it.quantidade),
+        preco_compra: it.preco_compra === '' ? null : Number(it.preco_compra),
+        metodo_pagamento_id: it.metodo_pagamento_id || null,
+      }))
     if (itensValidos.length === 0) return
 
     enviandoRef.current = true
     try {
-      await onCriarPedido({ ...form, itens: itensValidos })
-      setForm(pedidoVazio(unidadeIdPadrao))
+      await onSalvar({ ...form, itens: itensValidos })
     } finally {
       enviandoRef.current = false
     }
   }
 
   return (
-    <form onSubmit={salvar} className="card">
-      <h2 className="card-title">Registrar pedido</h2>
-      <p className="card-subtitle">
-        Anote o que o cliente pediu. O preço de compra e a separação dos itens ficam para a aba "Compras".
-      </p>
-
+    <form onSubmit={salvar} className="edit-pedido-form">
       <div className="row-fields">
         <Field label="Cliente">
           <select
@@ -100,7 +110,7 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
 
       <div className="slip">
         {form.itens.map((item, idx) => (
-          <div key={idx} className="item-row">
+          <div key={item.id ?? `novo-${idx}`} className="item-row">
             <ProdutoAutocomplete
               className="item-produto"
               placeholder="Produto"
@@ -132,6 +142,30 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
                 </option>
               ))}
             </select>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              placeholder="R$/un"
+              className="item-preco-compra"
+              value={item.preco_compra}
+              onChange={(e) => updateItem(idx, 'preco_compra', e.target.value)}
+              title="Preço pago por unidade"
+            />
+            <select
+              className="item-metodo-compra"
+              value={item.metodo_pagamento_id}
+              onChange={(e) => updateItem(idx, 'metodo_pagamento_id', e.target.value)}
+              title="Como a empresa pagou este item"
+            >
+              <option value="">Forma pgto.</option>
+              {metodosPagamento.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nome}
+                </option>
+              ))}
+            </select>
             <button type="button" className="item-remove" onClick={() => removeItem(idx)}>
               <Trash2 size={14} />
             </button>
@@ -152,8 +186,11 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
       </Field>
 
       <div className="form-actions">
+        <button type="button" className="text-btn" onClick={onCancelar}>
+          Cancelar
+        </button>
         <button type="submit" className="primary-btn" disabled={salvando}>
-          {salvando ? 'Salvando…' : 'Salvar pedido'}
+          {salvando ? 'Salvando…' : 'Salvar alterações'}
         </button>
       </div>
     </form>
