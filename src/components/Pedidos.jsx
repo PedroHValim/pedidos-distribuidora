@@ -9,6 +9,7 @@ export default function Pedidos({
   clientes,
   unidades,
   metodosPagamento,
+  cartoes,
   produtos,
   salvandoEdicao,
   onAvancarStatus,
@@ -111,6 +112,7 @@ export default function Pedidos({
                     clientes={clientes}
                     unidades={unidades}
                     metodosPagamento={metodosPagamento}
+                    cartoes={cartoes}
                     produtos={produtos}
                     salvando={salvandoEdicao}
                     onSalvar={(form) => salvarEdicao(p.id, form)}

@@ -38,6 +38,13 @@ export function pedidoCustoTotal(pedido) {
   return itens.reduce((soma, it) => soma + itemCustoTotal(it), 0)
 }
 
+// Só quando a forma de pagamento é "Crédito" faz sentido perguntar qual
+// cartão e em quantas vezes foi parcelado.
+export function metodoEhCredito(metodoId, metodosPagamento) {
+  const metodo = metodosPagamento.find((m) => m.id === metodoId)
+  return metodo?.nome?.toLowerCase() === 'crédito'
+}
+
 // Normaliza pra comparar nomes de produto: ignora maiúscula/minúscula,
 // acento (peça = peca) e espaços extras. Só usado pra comparar — o nome
 // digitado continua sendo salvo do jeito que a pessoa escreveu.

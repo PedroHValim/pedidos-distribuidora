@@ -71,6 +71,21 @@ insert into metodos_pagamento (nome) values
   ('Boleto')
 on conflict (nome) do nothing;
 
+-- Cartões da empresa — só é usado quando a forma de pagamento do item é "Crédito"
+create table if not exists cartoes (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null unique,
+  ativo boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+insert into cartoes (nome) values
+  ('AMEX'),
+  ('XP'),
+  ('BANCO DO BRASIL'),
+  ('PASSAI')
+on conflict (nome) do nothing;
+
 -- Pedidos (um por cliente/entrega) -------------------------------------------
 
 create table pedidos (
@@ -86,7 +101,8 @@ create table pedidos (
 
 -- Itens de cada pedido. metodo_pagamento_id é como A EMPRESA pagou o
 -- fornecedor por aquele item (controle interno de compra), preenchido
--- junto com o preço de compra na aba "Compras".
+-- junto com o preço de compra na aba "Compras". cartao_id e parcelas só
+-- fazem sentido quando o metodo_pagamento é "Crédito".
 create table pedido_itens (
   id uuid primary key default gen_random_uuid(),
   pedido_id uuid not null references pedidos(id) on delete cascade,
@@ -95,6 +111,8 @@ create table pedido_itens (
   unidade_id uuid not null references unidades(id),
   preco_compra numeric,
   metodo_pagamento_id uuid references metodos_pagamento(id),
+  cartao_id uuid references cartoes(id),
+  parcelas integer,
   comprado boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -125,6 +143,7 @@ create trigger trg_pedidos_updated_at
 alter table clientes enable row level security;
 alter table unidades enable row level security;
 alter table metodos_pagamento enable row level security;
+alter table cartoes enable row level security;
 alter table produtos enable row level security;
 alter table pedidos enable row level security;
 alter table pedido_itens enable row level security;
@@ -137,6 +156,9 @@ create policy "acesso total unidades" on unidades for all using (true) with chec
 
 drop policy if exists "acesso total metodos_pagamento" on metodos_pagamento;
 create policy "acesso total metodos_pagamento" on metodos_pagamento for all using (true) with check (true);
+
+drop policy if exists "acesso total cartoes" on cartoes;
+create policy "acesso total cartoes" on cartoes for all using (true) with check (true);
 
 drop policy if exists "acesso total produtos" on produtos;
 create policy "acesso total produtos" on produtos for all using (true) with check (true);

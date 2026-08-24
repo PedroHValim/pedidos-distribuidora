@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { PackageCheck, Pencil, ShoppingCart, Trash2 } from 'lucide-react'
 import EditarPedidoForm from './EditarPedidoForm.jsx'
-import { currency, formatData, normalizaProduto, itemCustoTotal } from '../utils.js'
+import { currency, formatData, normalizaProduto, itemCustoTotal, metodoEhCredito } from '../utils.js'
+
+const PARCELAS_OPCOES = [1, 2, 3, 4, 6, 10, 12]
 
 // Estatísticas de preço pago historicamente por produto (menor preço, preço
 // médio e quantas vezes já foi comprado), a partir de todos os itens já
@@ -30,9 +32,13 @@ function useEstatisticasPreco(todosPedidos) {
   }, [todosPedidos])
 }
 
-function ItemCompraRow({ item, estatisticas, metodosPagamento, podeExcluir, onAtualizarItem, onExcluirItem }) {
+function ItemCompraRow({ item, estatisticas, metodosPagamento, cartoes, podeExcluir, onAtualizarItem, onExcluirItem }) {
   const [precoLocal, setPrecoLocal] = useState(item.preco_compra ?? '')
   const [metodoLocal, setMetodoLocal] = useState(item.metodo_pagamento_id ?? '')
+  const [cartaoLocal, setCartaoLocal] = useState(item.cartao_id ?? '')
+  const [parcelasLocal, setParcelasLocal] = useState(item.parcelas ?? 1)
+
+  const ehCredito = metodoEhCredito(metodoLocal, metodosPagamento)
 
   function commitPreco() {
     const valor = precoLocal === '' ? null : Number(precoLocal)
@@ -43,14 +49,33 @@ function ItemCompraRow({ item, estatisticas, metodosPagamento, podeExcluir, onAt
 
   function commitMetodo(valor) {
     setMetodoLocal(valor)
-    onAtualizarItem(item.id, { metodo_pagamento_id: valor || null })
+    const viraCredito = metodoEhCredito(valor, metodosPagamento)
+    const patch = { metodo_pagamento_id: valor || null }
+    // trocar pra uma forma que não é Crédito limpa cartão/parcelas
+    if (!viraCredito) {
+      setCartaoLocal('')
+      patch.cartao_id = null
+      patch.parcelas = null
+    }
+    onAtualizarItem(item.id, patch)
   }
 
-  const faltaInfo = precoLocal === '' || precoLocal == null || !metodoLocal
+  function commitCartao(valor) {
+    setCartaoLocal(valor)
+    onAtualizarItem(item.id, { cartao_id: valor || null })
+  }
+
+  function commitParcelas(valor) {
+    setParcelasLocal(valor)
+    onAtualizarItem(item.id, { parcelas: valor })
+  }
+
+  const faltaInfo = precoLocal === '' || precoLocal == null || !metodoLocal || (ehCredito && !cartaoLocal)
 
   function toggleComprado() {
     const proximo = !item.comprado
     // marcar como comprado exige preço e forma de pagamento já preenchidos
+    // (e cartão também, se a forma escolhida for Crédito)
     if (proximo && faltaInfo) return
     onAtualizarItem(item.id, { comprado: proximo })
   }
@@ -107,6 +132,36 @@ function ItemCompraRow({ item, estatisticas, metodosPagamento, podeExcluir, onAt
         ))}
       </select>
 
+      {ehCredito && (
+        <div className="item-credito-extra">
+          <select
+            className="item-cartao"
+            value={cartaoLocal}
+            onChange={(e) => commitCartao(e.target.value)}
+            title="Qual cartão"
+          >
+            <option value="">Qual cartão?</option>
+            {cartoes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+          <div className="parcelas-chips">
+            {PARCELAS_OPCOES.map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={`chip chip-parcela ${Number(parcelasLocal) === n ? 'chip-active' : ''}`}
+                onClick={() => commitParcelas(n)}
+              >
+                {n}x
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <button
         type="button"
         className="item-excluir-compra"
@@ -126,6 +181,7 @@ export default function Compras({
   clientes,
   unidades,
   metodosPagamento,
+  cartoes,
   produtos,
   salvandoEdicao,
   onAtualizarItem,
@@ -186,6 +242,7 @@ export default function Compras({
                 clientes={clientes}
                 unidades={unidades}
                 metodosPagamento={metodosPagamento}
+                cartoes={cartoes}
                 produtos={produtos}
                 salvando={salvandoEdicao}
                 onSalvar={(form) => salvarEdicao(pedido.id, form)}
@@ -200,6 +257,7 @@ export default function Compras({
                       item={item}
                       estatisticas={estatisticasPreco(item.produto, item.id)}
                       metodosPagamento={metodosPagamento}
+                      cartoes={cartoes}
                       podeExcluir={itens.length > 1}
                       onAtualizarItem={onAtualizarItem}
                       onExcluirItem={onExcluirItem}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle } from 'lucide-react'
 import { supabase, supabaseConfigurado } from './supabaseClient.js'
-import { normalizaProduto } from './utils.js'
+import { normalizaProduto, metodoEhCredito } from './utils.js'
 import NovoPedido from './components/NovoPedido.jsx'
 import Compras from './components/Compras.jsx'
 import Pedidos from './components/Pedidos.jsx'
@@ -16,13 +16,14 @@ function TabButton({ icon, label, active, onClick }) {
 }
 
 const PEDIDO_SELECT =
-  '*, cliente:clientes(id,nome), pedido_itens(*, unidade:unidades(id,nome), metodo_pagamento:metodos_pagamento(id,nome))'
+  '*, cliente:clientes(id,nome), pedido_itens(*, unidade:unidades(id,nome), metodo_pagamento:metodos_pagamento(id,nome), cartao:cartoes(id,nome))'
 
 export default function App() {
   const [pedidos, setPedidos] = useState([])
   const [clientes, setClientes] = useState([])
   const [unidades, setUnidades] = useState([])
   const [metodosPagamento, setMetodosPagamento] = useState([])
+  const [cartoes, setCartoes] = useState([])
   const [produtos, setProdutos] = useState([])
   const [loading, setLoading] = useState(true)
   const [salvando, setSalvando] = useState(false)
@@ -44,10 +45,11 @@ export default function App() {
   }
 
   async function fetchListasFixas() {
-    const [clientesRes, unidadesRes, metodosRes, produtosRes] = await Promise.all([
+    const [clientesRes, unidadesRes, metodosRes, cartoesRes, produtosRes] = await Promise.all([
       supabase.from('clientes').select('*').eq('ativo', true).order('nome'),
       supabase.from('unidades').select('*').eq('ativo', true).order('nome'),
       supabase.from('metodos_pagamento').select('*').eq('ativo', true).order('nome'),
+      supabase.from('cartoes').select('*').eq('ativo', true).order('nome'),
       supabase.from('produtos').select('*').eq('ativo', true).order('nome'),
     ])
     if (clientesRes.error) setErro(clientesRes.error.message)
@@ -58,6 +60,9 @@ export default function App() {
 
     if (metodosRes.error) setErro(metodosRes.error.message)
     else setMetodosPagamento(metodosRes.data || [])
+
+    if (cartoesRes.error) setErro(cartoesRes.error.message)
+    else setCartoes(cartoesRes.data || [])
 
     if (produtosRes.error) setErro(produtosRes.error.message)
     else setProdutos(produtosRes.data || [])
@@ -190,6 +195,8 @@ export default function App() {
             unidade_id: it.unidade_id,
             preco_compra: it.preco_compra,
             metodo_pagamento_id: it.metodo_pagamento_id,
+            cartao_id: it.cartao_id,
+            parcelas: it.parcelas,
           }))
         )
       )
@@ -197,7 +204,12 @@ export default function App() {
 
     for (const it of itensExistentes) {
       const itemOriginal = itensOriginais.find((o) => o.id === it.id)
-      const compradoFinal = itemOriginal.comprado && it.preco_compra != null && it.metodo_pagamento_id != null
+      const precisaCartao = metodoEhCredito(it.metodo_pagamento_id, metodosPagamento)
+      const compradoFinal =
+        itemOriginal.comprado &&
+        it.preco_compra != null &&
+        it.metodo_pagamento_id != null &&
+        (!precisaCartao || it.cartao_id != null)
 
       const patch = {
         produto: it.produto,
@@ -205,6 +217,8 @@ export default function App() {
         unidade_id: it.unidade_id,
         preco_compra: it.preco_compra,
         metodo_pagamento_id: it.metodo_pagamento_id,
+        cartao_id: it.cartao_id,
+        parcelas: it.parcelas,
         comprado: compradoFinal,
       }
       operacoes.push(supabase.from('pedido_itens').update(patch).eq('id', it.id))
@@ -308,6 +322,7 @@ export default function App() {
             clientes={clientes}
             unidades={unidades}
             metodosPagamento={metodosPagamento}
+            cartoes={cartoes}
             produtos={produtos}
             salvandoEdicao={salvandoEdicao}
             onAtualizarItem={atualizarItem}
@@ -322,6 +337,7 @@ export default function App() {
             clientes={clientes}
             unidades={unidades}
             metodosPagamento={metodosPagamento}
+            cartoes={cartoes}
             produtos={produtos}
             salvandoEdicao={salvandoEdicao}
             onAvancarStatus={avancarStatus}

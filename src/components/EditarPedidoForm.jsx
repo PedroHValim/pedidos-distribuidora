@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Field, ProdutoAutocomplete } from './ui.jsx'
+import { metodoEhCredito } from '../utils.js'
+
+const PARCELAS_OPCOES = [1, 2, 3, 4, 6, 10, 12]
 
 // Formulário de edição de um pedido já criado — cliente, datas, observação e
 // itens (produto, quantidade, unidade, preço pago e forma de pagamento).
@@ -8,7 +11,7 @@ import { Field, ProdutoAutocomplete } from './ui.jsx'
 // Pedidos (pedido "separado" ou "entregue"): editar o preço de um item aqui
 // atualiza o custo em qualquer lugar que dependa dele (Pedidos, Painel),
 // porque tudo é calculado a partir do preco_compra salvo no banco.
-export default function EditarPedidoForm({ pedido, clientes, unidades, metodosPagamento, produtos, salvando, onSalvar, onCancelar }) {
+export default function EditarPedidoForm({ pedido, clientes, unidades, metodosPagamento, cartoes, produtos, salvando, onSalvar, onCancelar }) {
   const [form, setForm] = useState(() => ({
     cliente_id: pedido.cliente?.id || '',
     data_pedido: pedido.data_pedido || '',
@@ -21,6 +24,8 @@ export default function EditarPedidoForm({ pedido, clientes, unidades, metodosPa
       unidade_id: it.unidade_id || it.unidade?.id || '',
       preco_compra: it.preco_compra ?? '',
       metodo_pagamento_id: it.metodo_pagamento_id || '',
+      cartao_id: it.cartao_id || '',
+      parcelas: it.parcelas || '',
     })),
   }))
   // guarda síncrona contra duplo toque (o `disabled` do botão só reflete no
@@ -32,13 +37,21 @@ export default function EditarPedidoForm({ pedido, clientes, unidades, metodosPa
     setForm((f) => {
       const itens = [...f.itens]
       itens[idx] = { ...itens[idx], [field]: value }
+      // trocar a forma de pagamento pra algo que não é Crédito limpa cartão/parcelas
+      if (field === 'metodo_pagamento_id' && !metodoEhCredito(value, metodosPagamento)) {
+        itens[idx].cartao_id = ''
+        itens[idx].parcelas = ''
+      }
       return { ...f, itens }
     })
   }
   function addItem() {
     setForm((f) => ({
       ...f,
-      itens: [...f.itens, { produto: '', quantidade: '', unidade_id: unidades[0]?.id || '', preco_compra: '', metodo_pagamento_id: '' }],
+      itens: [
+        ...f.itens,
+        { produto: '', quantidade: '', unidade_id: unidades[0]?.id || '', preco_compra: '', metodo_pagamento_id: '', cartao_id: '', parcelas: '' },
+      ],
     }))
   }
   function removeItem(idx) {
@@ -51,12 +64,17 @@ export default function EditarPedidoForm({ pedido, clientes, unidades, metodosPa
     if (!form.cliente_id) return
     const itensValidos = form.itens
       .filter((it) => it.produto.trim() && Number(it.quantidade) > 0 && it.unidade_id)
-      .map((it) => ({
-        ...it,
-        quantidade: Number(it.quantidade),
-        preco_compra: it.preco_compra === '' ? null : Number(it.preco_compra),
-        metodo_pagamento_id: it.metodo_pagamento_id || null,
-      }))
+      .map((it) => {
+        const ehCredito = metodoEhCredito(it.metodo_pagamento_id, metodosPagamento)
+        return {
+          ...it,
+          quantidade: Number(it.quantidade),
+          preco_compra: it.preco_compra === '' ? null : Number(it.preco_compra),
+          metodo_pagamento_id: it.metodo_pagamento_id || null,
+          cartao_id: ehCredito && it.cartao_id ? it.cartao_id : null,
+          parcelas: ehCredito ? Number(it.parcelas || 1) : null,
+        }
+      })
     if (itensValidos.length === 0) return
 
     enviandoRef.current = true
@@ -109,68 +127,103 @@ export default function EditarPedidoForm({ pedido, clientes, unidades, metodosPa
       </div>
 
       <div className="slip">
-        {form.itens.map((item, idx) => (
-          <div key={item.id ?? `novo-${idx}`} className="item-row">
-            <ProdutoAutocomplete
-              className="item-produto"
-              placeholder="Produto"
-              value={item.produto}
-              onChange={(v) => updateItem(idx, 'produto', v)}
-              produtos={produtos}
-            />
-            <span className="item-x">×</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              inputMode="decimal"
-              placeholder="Qtd"
-              className="item-qtd"
-              value={item.quantidade}
-              onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}
-              title="Quantidade"
-            />
-            <select
-              className="item-unidade"
-              value={item.unidade_id}
-              onChange={(e) => updateItem(idx, 'unidade_id', e.target.value)}
-              title="Unidade"
-            >
-              {unidades.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nome}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              inputMode="decimal"
-              placeholder="R$/un"
-              className="item-preco-compra"
-              value={item.preco_compra}
-              onChange={(e) => updateItem(idx, 'preco_compra', e.target.value)}
-              title="Preço pago por unidade"
-            />
-            <select
-              className="item-metodo-compra"
-              value={item.metodo_pagamento_id}
-              onChange={(e) => updateItem(idx, 'metodo_pagamento_id', e.target.value)}
-              title="Como a empresa pagou este item"
-            >
-              <option value="">Forma pgto.</option>
-              {metodosPagamento.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nome}
-                </option>
-              ))}
-            </select>
-            <button type="button" className="item-remove" onClick={() => removeItem(idx)}>
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
+        {form.itens.map((item, idx) => {
+          const ehCredito = metodoEhCredito(item.metodo_pagamento_id, metodosPagamento)
+          return (
+            <div key={item.id ?? `novo-${idx}`} className="item-row-wrap">
+              <div className="item-row">
+                <ProdutoAutocomplete
+                  className="item-produto"
+                  placeholder="Produto"
+                  value={item.produto}
+                  onChange={(v) => updateItem(idx, 'produto', v)}
+                  produtos={produtos}
+                />
+                <span className="item-x">×</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="Qtd"
+                  className="item-qtd"
+                  value={item.quantidade}
+                  onChange={(e) => updateItem(idx, 'quantidade', e.target.value)}
+                  title="Quantidade"
+                />
+                <select
+                  className="item-unidade"
+                  value={item.unidade_id}
+                  onChange={(e) => updateItem(idx, 'unidade_id', e.target.value)}
+                  title="Unidade"
+                >
+                  {unidades.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nome}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="R$/un"
+                  className="item-preco-compra"
+                  value={item.preco_compra}
+                  onChange={(e) => updateItem(idx, 'preco_compra', e.target.value)}
+                  title="Preço pago por unidade"
+                />
+                <select
+                  className="item-metodo-compra"
+                  value={item.metodo_pagamento_id}
+                  onChange={(e) => updateItem(idx, 'metodo_pagamento_id', e.target.value)}
+                  title="Como a empresa pagou este item"
+                >
+                  <option value="">Forma pgto.</option>
+                  {metodosPagamento.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nome}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="item-remove" onClick={() => removeItem(idx)}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+
+              {ehCredito && (
+                <div className="item-credito-extra">
+                  <select
+                    className="item-cartao"
+                    value={item.cartao_id}
+                    onChange={(e) => updateItem(idx, 'cartao_id', e.target.value)}
+                    title="Qual cartão"
+                  >
+                    <option value="">Qual cartão?</option>
+                    {cartoes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="parcelas-chips">
+                    {PARCELAS_OPCOES.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        className={`chip chip-parcela ${Number(item.parcelas) === n || (!item.parcelas && n === 1) ? 'chip-active' : ''}`}
+                        onClick={() => updateItem(idx, 'parcelas', n)}
+                      >
+                        {n}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
         <button type="button" className="add-item-btn" onClick={addItem}>
           <Plus size={14} /> Adicionar item
         </button>
