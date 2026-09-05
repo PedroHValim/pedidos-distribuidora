@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,6 +8,9 @@ import {
   ClipboardList,
   Clock,
   Heart,
+  History,
+  PackageCheck,
+  RefreshCw,
   Lock,
   LogOut,
   Mail,
@@ -161,15 +164,105 @@ function AcessoPortal({ onAutenticar }) {
   )
 }
 
+// Histórico da empresa logada. Os valores NÃO aparecem de propósito: os
+// únicos preços que o sistema guarda são os de compra (o que a RAV pagou ao
+// fornecedor), e isso é margem — não pode chegar ao cliente. A situação
+// também vem traduzida pela função, sem o "comprando" interno.
+function HistoricoPedidos({ onBuscarPedidos, recarregar }) {
+  const [pedidos, setPedidos] = useState([])
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState('')
+
+  const carregar = useCallback(async () => {
+    setCarregando(true)
+    setErro('')
+    try {
+      setPedidos(await onBuscarPedidos())
+    } catch (err) {
+      setErro(err?.message || 'Não consegui carregar seus pedidos.')
+    } finally {
+      setCarregando(false)
+    }
+  }, [onBuscarPedidos])
+
+  useEffect(() => {
+    carregar()
+  }, [carregar, recarregar])
+
+  return (
+    <section id="historico" className="rav-secao rav-secao-clara">
+      <div className="rav-container">
+        <div className="rav-historico-topo">
+          <div>
+            <span className="rav-secao-eyebrow">Seus pedidos</span>
+            <h2 className="rav-secao-titulo">Histórico</h2>
+          </div>
+          <button type="button" className="rav-btn rav-btn-fantasma rav-btn-sm" onClick={carregar} disabled={carregando}>
+            <RefreshCw size={15} /> Atualizar
+          </button>
+        </div>
+
+        {erro && <p className="rav-erro">{erro}</p>}
+
+        {carregando && !erro && <p className="rav-historico-vazio">Carregando seus pedidos…</p>}
+
+        {!carregando && !erro && pedidos.length === 0 && (
+          <p className="rav-historico-vazio">
+            Você ainda não fez nenhum pedido por aqui. Assim que fizer o primeiro, ele aparece nesta lista.
+          </p>
+        )}
+
+        {!carregando && pedidos.length > 0 && (
+          <ul className="rav-historico">
+            {pedidos.map((p) => (
+              <li key={p.id} className="rav-historico-card">
+                <div className="rav-historico-cabecalho">
+                  <div>
+                    <strong>{p.data_pedido ? p.data_pedido.split('-').reverse().join('/') : ''}</strong>
+                    {p.data_entrega && (
+                      <span className="rav-historico-entrega">
+                        entrega {p.data_entrega.split('-').reverse().join('/')}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`rav-situacao ${p.entregue ? 'rav-situacao-ok' : ''}`}>
+                    {p.entregue ? <PackageCheck size={12} /> : <Clock size={12} />} {p.situacao}
+                  </span>
+                </div>
+
+                <ul className="rav-historico-itens">
+                  {p.itens.map((it) => (
+                    <li key={it.id}>
+                      <span>{it.produto}</span>
+                      <span className="rav-resumo-qtd">
+                        {it.quantidade} {(it.unidade || '').toLowerCase()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                {p.obs && <p className="rav-historico-obs">{p.obs}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  )
+}
+
 export default function PortalCliente({
   sessao,
   unidades = [],
   produtos = [],
   onAutenticar,
   onSair,
+  onBuscarPedidos,
   onEnviarPedido,
   onVoltar,
 }) {
+  // muda depois de cada pedido enviado, pra o histórico recarregar sozinho
+  const [versaoHistorico, setVersaoHistorico] = useState(0)
   const unidadeIdPadrao = unidadePadraoId(unidades)
 
   const [etapa, setEtapa] = useState(1)
@@ -254,6 +347,7 @@ export default function PortalCliente({
         })),
       })
       setEnviado(true)
+      setVersaoHistorico((v) => v + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       setErroEnvio(err?.message || 'Não consegui enviar o pedido. Tente de novo em instantes.')
@@ -291,6 +385,11 @@ export default function PortalCliente({
           </button>
 
           <nav className="rav-nav">
+            {sessao && (
+              <button type="button" onClick={() => irPara('historico')}>
+                <History size={14} /> Meus pedidos
+              </button>
+            )}
             <button type="button" onClick={() => irPara('sobre')}>
               A empresa
             </button>
@@ -775,6 +874,8 @@ export default function PortalCliente({
               )}
             </div>
           </section>
+
+          {sessao && <HistoricoPedidos onBuscarPedidos={onBuscarPedidos} recarregar={versaoHistorico} />}
         </main>
       )}
 

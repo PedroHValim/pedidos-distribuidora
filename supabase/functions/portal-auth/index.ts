@@ -17,6 +17,7 @@
 // (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY já existem automaticamente)
 
 import { createClient } from 'npm:@supabase/supabase-js@^2.58.0'
+import { gerarToken } from '../_shared/token.ts'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -134,11 +135,21 @@ async function cadastrar(nomeEmpresa: string, senha: string) {
 
   const normalizado = normaliza(nome)
 
-  const { data: jaExiste } = await admin
+  const { data: jaExiste, error: erroConsulta } = await admin
     .from('portal_empresas')
     .select('id')
     .eq('nome_normalizado', normalizado)
     .maybeSingle()
+
+  // sem isso, tabela inexistente passava batido aqui e só estourava lá na
+  // frente, com uma mensagem que não dizia o que estava faltando
+  if (erroConsulta) {
+    console.error(erroConsulta)
+    return resposta(
+      { error: 'Configuração pendente no servidor: não consegui acessar a tabela portal_empresas.' },
+      500
+    )
+  }
 
   if (jaExiste) {
     return resposta({ error: 'Já existe um acesso para essa empresa. Use "Entrar" ou fale com a gente.' }, 409)
@@ -155,7 +166,14 @@ async function cadastrar(nomeEmpresa: string, senha: string) {
 
   if (error || !data) return resposta({ error: 'Não consegui criar o acesso. Tente de novo.' }, 500)
 
-  return resposta({ sessao: { empresa_id: data.id, cliente_id: data.cliente_id, nome_empresa: data.nome_empresa } })
+  return resposta({
+    sessao: {
+      empresa_id: data.id,
+      cliente_id: data.cliente_id,
+      nome_empresa: data.nome_empresa,
+      token: await gerarToken({ cid: data.cliente_id, eid: data.id, nome: data.nome_empresa }),
+    },
+  })
 }
 
 async function entrar(nomeEmpresa: string, senha: string) {
@@ -184,7 +202,14 @@ async function entrar(nomeEmpresa: string, senha: string) {
 
   await admin.from('portal_empresas').update({ ultimo_acesso: new Date().toISOString() }).eq('id', conta.id)
 
-  return resposta({ sessao: { empresa_id: conta.id, cliente_id: conta.cliente_id, nome_empresa: conta.nome_empresa } })
+  return resposta({
+    sessao: {
+      empresa_id: conta.id,
+      cliente_id: conta.cliente_id,
+      nome_empresa: conta.nome_empresa,
+      token: await gerarToken({ cid: conta.cliente_id, eid: conta.id, nome: conta.nome_empresa }),
+    },
+  })
 }
 
 Deno.serve(async (req) => {
@@ -199,6 +224,15 @@ Deno.serve(async (req) => {
     return resposta({ error: 'Ação inválida.' }, 400)
   } catch (err) {
     console.error(err)
+    // Erros de configuração dão uma mensagem específica: senão a pessoa vê
+    // "tente de novo" pra sempre e nada indica o que realmente falta.
+    const detalhe = err instanceof Error ? err.message : ''
+    if (detalhe.includes('PORTAL_TOKEN_SECRET')) {
+      return resposta({ error: 'Configuração pendente no servidor: falta definir PORTAL_TOKEN_SECRET.' }, 500)
+    }
+    if (detalhe.includes('portal_empresas')) {
+      return resposta({ error: 'Configuração pendente no servidor: a tabela portal_empresas não existe.' }, 500)
+    }
     return resposta({ error: 'Erro ao processar a solicitação.' }, 500)
   }
 })

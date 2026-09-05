@@ -150,6 +150,12 @@ export default function App() {
   }, [rota])
 
   useEffect(() => {
+    // sessões salvas antes de existir token assinado não conseguem abrir o
+    // histórico; melhor pedir pra entrar de novo do que mostrar erro depois
+    if (sessaoPortal && !sessaoPortal.token) sairPortal()
+  }, [sessaoPortal])
+
+  useEffect(() => {
     const aoTrocarHash = () => setRota(window.location.hash)
     window.addEventListener('hashchange', aoTrocarHash)
     return () => window.removeEventListener('hashchange', aoTrocarHash)
@@ -205,13 +211,25 @@ export default function App() {
 
     if (error) {
       // a função responde 401/409 com uma mensagem própria; o supabase-js
-      // trata isso como erro e guarda a resposta original em error.context
-      let mensagem = 'Não consegui completar. Tente de novo em instantes.'
+      // trata isso como erro e guarda a resposta original em error.context.
+      // Vale ler tanto `error` (nossas mensagens) quanto `message` (as do
+      // próprio Supabase, como "function not found") — só olhar `error`
+      // escondia a causa real atrás de um texto genérico.
+      console.error('[portal-auth] falhou:', error)
+      const status = error.context?.status
+      let mensagem = ''
       try {
-        const corpo = await error.context?.json()
-        if (corpo?.error) mensagem = corpo.error
+        const corpo = await error.context?.clone().json()
+        mensagem = corpo?.error || corpo?.message || corpo?.msg || ''
       } catch {
-        /* resposta sem corpo legível: fica a mensagem genérica */
+        /* sem corpo legível: cai nas mensagens por status abaixo */
+      }
+
+      if (!mensagem) {
+        if (status === 404) mensagem = 'O serviço de acesso ainda não foi publicado (portal-auth não encontrado).'
+        else if (status === 500) mensagem = 'O serviço de acesso respondeu com erro. Confira os logs da função.'
+        else if (status) mensagem = `O serviço de acesso respondeu com erro ${status}.`
+        else mensagem = 'Não consegui falar com o servidor. Verifique a conexão e tente de novo.'
       }
       throw new Error(mensagem)
     }
@@ -225,6 +243,40 @@ export default function App() {
     } catch {
       /* navegador sem localStorage: a sessão vale só enquanto a aba estiver aberta */
     }
+  }
+
+  // Histórico da empresa logada. Vem de uma Edge Function (e não direto do
+  // banco) porque o filtro por cliente precisa ser aplicado no servidor, a
+  // partir do token assinado — um filtro montado aqui no navegador seria
+  // trocado por qualquer um pra ler os pedidos de outra empresa.
+  async function buscarPedidosPortal() {
+    if (!sessaoPortal?.token) return []
+
+    const { data, error } = await supabase.functions.invoke('portal-pedidos', {
+      body: { token: sessaoPortal.token },
+    })
+
+    if (error) {
+      console.error('[portal-pedidos] falhou:', error)
+      const status = error.context?.status
+      if (status === 401) {
+        sairPortal()
+        throw new Error('Sua sessão expirou. Entre de novo para ver seus pedidos.')
+      }
+      let mensagem = ''
+      try {
+        const corpo = await error.context?.clone().json()
+        mensagem = corpo?.error || corpo?.message || ''
+      } catch {
+        /* sem corpo legível */
+      }
+      throw new Error(
+        mensagem || (status === 404 ? 'O serviço de histórico ainda não foi publicado.' : 'Não consegui carregar seus pedidos.')
+      )
+    }
+
+    if (data?.error) throw new Error(data.error)
+    return data?.pedidos || []
   }
 
   function sairPortal() {
@@ -472,6 +524,7 @@ export default function App() {
         produtos={produtos}
         onAutenticar={autenticarPortal}
         onSair={sairPortal}
+        onBuscarPedidos={buscarPedidosPortal}
         onEnviarPedido={criarPedidoPortal}
         onVoltar={() => {
           window.location.hash = ''
