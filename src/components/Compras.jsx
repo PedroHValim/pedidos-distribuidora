@@ -187,6 +187,7 @@ export default function Compras({
   onAtualizarItem,
   onExcluirItem,
   onCompletarPedido,
+  onExcluirPedido,
   onEditarPedido,
 }) {
   const [editandoId, setEditandoId] = useState(null)
@@ -231,6 +232,13 @@ export default function Compras({
                   </div>
                   <button type="button" className="edit-pedido-btn" onClick={() => setEditandoId(pedido.id)}>
                     <Pencil size={13} /> Editar
+                  </button>
+                  <button
+                    type="button"
+                    className="text-btn danger"
+                    onClick={() => onExcluirPedido(pedido.id)}
+                  >
+                    Excluir
                   </button>
                 </div>
               )}

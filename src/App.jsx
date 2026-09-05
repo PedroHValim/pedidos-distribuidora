@@ -328,6 +328,7 @@ export default function App() {
             onAtualizarItem={atualizarItem}
             onExcluirItem={excluirItem}
             onCompletarPedido={completarPedido}
+            onExcluirPedido={excluirPedido}
             onEditarPedido={editarPedido}
           />
         )}

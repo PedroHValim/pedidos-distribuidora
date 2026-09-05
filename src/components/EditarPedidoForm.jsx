@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Field, ProdutoAutocomplete } from './ui.jsx'
-import { metodoEhCredito } from '../utils.js'
+import { metodoEhCredito, unidadePadraoId } from '../utils.js'
 
 const PARCELAS_OPCOES = [1, 2, 3, 4, 6, 10, 12]
 
@@ -50,7 +50,7 @@ export default function EditarPedidoForm({ pedido, clientes, unidades, metodosPa
       ...f,
       itens: [
         ...f.itens,
-        { produto: '', quantidade: '', unidade_id: unidades[0]?.id || '', preco_compra: '', metodo_pagamento_id: '', cartao_id: '', parcelas: '' },
+        { produto: '', quantidade: '', unidade_id: unidadePadraoId(unidades), preco_compra: '', metodo_pagamento_id: '', cartao_id: '', parcelas: '' },
       ],
     }))
   }

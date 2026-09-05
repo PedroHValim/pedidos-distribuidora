@@ -230,6 +230,54 @@ code {
   cursor: default;
 }
 
+.ia-avaliacao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #cfe3d9;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #3a3f38;
+}
+
+.ia-avaliacao-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.ia-avaliacao-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #cfe3d9;
+  background: #fff;
+  border-radius: 7px;
+  padding: 6px 11px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ia-avaliacao-btn.ia-acertou {
+  color: #2f6f62;
+}
+
+.ia-avaliacao-btn.ia-acertou:hover {
+  background: #eaf2ee;
+}
+
+.ia-avaliacao-btn.ia-errou {
+  color: #c1443a;
+}
+
+.ia-avaliacao-btn.ia-errou:hover {
+  background: #fdedeb;
+}
+
 .row-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

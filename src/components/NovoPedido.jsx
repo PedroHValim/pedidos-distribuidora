@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
-import { Plus, Trash2, MessageCircle } from 'lucide-react'
+import { Plus, Trash2, MessageCircle, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { Field, ProdutoAutocomplete } from './ui.jsx'
 import { supabase } from '../supabaseClient.js'
-import { todayISO } from '../utils.js'
+import { todayISO, unidadePadraoId } from '../utils.js'
 
 const novoItem = (unidadeIdPadrao) => ({ produto: '', quantidade: '', unidade_id: unidadeIdPadrao || '' })
 const pedidoVazio = (unidadeIdPadrao) => ({
@@ -14,11 +14,15 @@ const pedidoVazio = (unidadeIdPadrao) => ({
 })
 
 export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades, produtos }) {
-  const unidadeIdPadrao = unidades[0]?.id || ''
+  const unidadeIdPadrao = unidadePadraoId(unidades)
   const [form, setForm] = useState(() => pedidoVazio(unidadeIdPadrao))
   const [textoWpp, setTextoWpp] = useState('')
   const [gerando, setGerando] = useState(false)
   const [erroGeracao, setErroGeracao] = useState('')
+  // Guarda o texto original + resultado da IA enquanto aguarda a pessoa dizer
+  // se acertou ou não — é o que vai pra tabela de avaliação (período de teste
+  // de ~15 dias combinado, pra analisar a precisão da IA depois).
+  const [avaliacaoPendente, setAvaliacaoPendente] = useState(null)
   // guarda síncrona: o estado `salvando` do App só chega no próximo render,
   // então um duplo toque rápido no botão passa pelo `disabled` antes dele
   // atualizar. Essa ref bloqueia o segundo envio na hora, sem esperar o React.
@@ -59,20 +63,40 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
     }
 
     const r = data.resultado
+    // valida que os ids que a IA devolveu realmente existem nas listas —
+    // se ela alucinar um id inválido, cai no padrão em vez de deixar o
+    // formulário com um valor que não bate com nenhuma opção do dropdown
+    const clienteValido = r.cliente_id && clientes.some((c) => c.id === r.cliente_id) ? r.cliente_id : ''
     setForm({
-      cliente_id: r.cliente_id || '',
+      cliente_id: clienteValido,
       data_pedido: todayISO(),
       data_entrega: r.data_entrega || '',
       obs: r.observacao || '',
       itens: r.itens.length
-        ? r.itens.map((it) => ({
-            produto: (it.produto_id && produtos.find((p) => p.id === it.produto_id)?.nome) || it.produto,
-            quantidade: it.quantidade != null ? it.quantidade : '',
-            unidade_id: it.unidade_id || unidadeIdPadrao,
-          }))
+        ? r.itens.map((it) => {
+            const unidadeValida = it.unidade_id && unidades.some((u) => u.id === it.unidade_id) ? it.unidade_id : unidadeIdPadrao
+            return {
+              produto: (it.produto_id && produtos.find((p) => p.id === it.produto_id)?.nome) || it.produto,
+              quantidade: it.quantidade != null ? it.quantidade : '',
+              unidade_id: unidadeValida,
+            }
+          })
         : [novoItem(unidadeIdPadrao)],
     })
+    setAvaliacaoPendente({ texto: textoWpp, resultado: r })
     setTextoWpp('')
+  }
+
+  // Registra se a leitura da IA acertou ou não — é só pra análise nossa
+  // durante o período de teste, não afeta o pedido em si.
+  async function avaliarResultadoIA(aprovado) {
+    if (!avaliacaoPendente) return
+    setAvaliacaoPendente(null)
+    await supabase.from('pedido_ia_avaliacoes').insert({
+      texto: avaliacaoPendente.texto,
+      resultado: avaliacaoPendente.resultado,
+      aprovado,
+    })
   }
 
   async function salvar(e) {
@@ -122,6 +146,19 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
             {gerando ? 'Lendo mensagem…' : 'Preencher automaticamente'}
           </button>
         </div>
+        {avaliacaoPendente && (
+          <div className="ia-avaliacao">
+            <span>A IA preencheu certo aí embaixo?</span>
+            <div className="ia-avaliacao-btns">
+              <button type="button" className="ia-avaliacao-btn ia-acertou" onClick={() => avaliarResultadoIA(true)}>
+                <ThumbsUp size={13} /> Acertou
+              </button>
+              <button type="button" className="ia-avaliacao-btn ia-errou" onClick={() => avaliarResultadoIA(false)}>
+                <ThumbsDown size={13} /> Errou
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="row-fields">

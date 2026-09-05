@@ -45,6 +45,13 @@ export function metodoEhCredito(metodoId, metodosPagamento) {
   return metodo?.nome?.toLowerCase() === 'crédito'
 }
 
+// Unidade padrão pra item novo/sem info: a unidade genérica "UNIDADES",
+// nunca a primeira da lista — como a lista vem em ordem alfabética,
+// `unidades[0]` seria "CAIXAS", o que preenchia item novo com a unidade errada.
+export function unidadePadraoId(unidades) {
+  return unidades.find((u) => u.nome?.toUpperCase() === 'UNIDADES')?.id || unidades[0]?.id || ''
+}
+
 // Normaliza pra comparar nomes de produto: ignora maiúscula/minúscula,
 // acento (peça = peca) e espaços extras. Só usado pra comparar — o nome
 // digitado continua sendo salvo do jeito que a pessoa escreveu.

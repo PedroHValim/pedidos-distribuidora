@@ -49,7 +49,13 @@ const PedidoExtraidoSchema = z.object({
   itens: z.array(ItemSchema),
 })
 
+function idPorNome(lista: any[], nome: string) {
+  return lista.find((item) => item.nome?.toUpperCase() === nome)?.id ?? null
+}
+
 function montarPrompt(clientes: any[], produtos: any[], unidades: any[]) {
+  const idUnidadeGenerica = idPorNome(unidades, 'UNIDADES')
+
   return `Você extrai dados de pedidos de uma distribuidora a partir de mensagens de clientes, geralmente copiadas do WhatsApp.
 
 Clientes já cadastrados:
@@ -64,9 +70,15 @@ ${JSON.stringify(unidades.map((u) => ({ id: u.id, nome: u.nome })))}
 Regras importantes, siga à risca:
 - Nunca invente um item que não foi mencionado na mensagem.
 - Nunca invente ou arredonde uma quantidade — se não estiver clara, deixe null nesse item.
-- Só preencha cliente_id, produto_id ou unidade_id quando tiver confiança real de que é o mesmo cadastro já existente (mesmo com grafia um pouco diferente). Na dúvida, deixe null — é preferível a pessoa confirmar manualmente do que a IA errar.
+- Só preencha cliente_id ou produto_id quando tiver confiança real de que é o mesmo cadastro já existente (mesmo com grafia um pouco diferente). Na dúvida, deixe null — é preferível a pessoa confirmar manualmente do que a IA errar.
 - Hoje é ${new Date().toISOString().slice(0, 10)}. Se a mensagem citar "amanhã", "sexta que vem" etc., calcule a data real em YYYY-MM-DD.
-- Se a mensagem não parecer um pedido de verdade, devolva itens: [].`
+- Se a mensagem não parecer um pedido de verdade, devolva itens: [].
+
+Sobre a unidade de cada item (unidade_id), diferente de cliente/produto, ela NUNCA deve ficar null — sempre preencha com a unidade mais provável:
+- Preste atenção em abreviações e variações comuns em português, mesmo que não sejam exatamente o nome cadastrado: "caixa"/"caixas"/"cx" → CAIXAS; "kg"/"kilo"/"kilos"/"quilo"/"quilos" → KILO; "pacote"/"pacotes"/"pct" → PACOTES; "saco"/"sacos"/"sc" → SACOS; "fardo"/"fardos"/"fd" → FARDOS.
+- Se a mensagem não especificar nenhuma unidade pra um item (só um número solto, tipo "2 arroz" ou "10 coca-cola"), use a unidade genérica${
+    idUnidadeGenerica ? ` (id "${idUnidadeGenerica}", nome UNIDADES)` : ' "UNIDADES"'
+  } — nunca deixe unidade_id como null.`
 }
 
 Deno.serve(async (req) => {
@@ -85,7 +97,7 @@ Deno.serve(async (req) => {
     }
 
     const response = await anthropic.messages.parse({
-      model: 'claude-opus-5',
+      model: 'claude-sonnet-5',
       max_tokens: 8000,
       thinking: { type: 'adaptive' },
       system: montarPrompt(clientes || [], produtos || [], unidades || []),

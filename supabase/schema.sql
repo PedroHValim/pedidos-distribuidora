@@ -86,6 +86,18 @@ insert into cartoes (nome) values
   ('PASSAI')
 on conflict (nome) do nothing;
 
+-- Registro de cada leitura automática da IA (mensagem colada + resultado
+-- devolvido) junto com se a pessoa marcou que acertou ou errou. Existe pra
+-- analisar a precisão da IA num período de teste — não tem relação com os
+-- pedidos de verdade.
+create table if not exists pedido_ia_avaliacoes (
+  id uuid primary key default gen_random_uuid(),
+  texto text not null,
+  resultado jsonb not null,
+  aprovado boolean not null,
+  created_at timestamptz not null default now()
+);
+
 -- Pedidos (um por cliente/entrega) -------------------------------------------
 
 create table pedidos (
@@ -145,6 +157,7 @@ alter table unidades enable row level security;
 alter table metodos_pagamento enable row level security;
 alter table cartoes enable row level security;
 alter table produtos enable row level security;
+alter table pedido_ia_avaliacoes enable row level security;
 alter table pedidos enable row level security;
 alter table pedido_itens enable row level security;
 
@@ -162,6 +175,9 @@ create policy "acesso total cartoes" on cartoes for all using (true) with check 
 
 drop policy if exists "acesso total produtos" on produtos;
 create policy "acesso total produtos" on produtos for all using (true) with check (true);
+
+drop policy if exists "acesso total pedido_ia_avaliacoes" on pedido_ia_avaliacoes;
+create policy "acesso total pedido_ia_avaliacoes" on pedido_ia_avaliacoes for all using (true) with check (true);
 
 drop policy if exists "acesso total pedidos" on pedidos;
 create policy "acesso total pedidos" on pedidos for all using (true) with check (true);
