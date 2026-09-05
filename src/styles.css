@@ -142,6 +142,176 @@ code {
   color: #8a2e22;
 }
 
+.banner-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner-fechar {
+  border: none;
+  background: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px -6px -6px 0;
+  flex-shrink: 0;
+}
+
+/* Barra de abas fixa embaixo — só no celular (ver media query no fim do
+   arquivo). Fica na altura do polegar, que é como a pessoa segura o
+   telefone enquanto anda pelo mercado marcando o que já comprou. */
+.bottom-nav {
+  display: none;
+}
+
+.bottom-nav-btn {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: none;
+  background: none;
+  color: #8a9089;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 8px 2px;
+  min-height: 54px;
+  cursor: pointer;
+}
+
+.bottom-nav-btn-active {
+  color: #1c2321;
+}
+
+.bottom-nav-btn-active svg {
+  color: #2f6f62;
+}
+
+/* Confirmação de exclusão */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(28, 35, 33, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.confirm-sheet {
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+}
+
+.confirm-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: #fdedeb;
+  color: #c1443a;
+}
+
+.confirm-titulo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.confirm-descricao {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6b7268;
+  margin: 0 0 18px;
+}
+
+.confirm-acoes {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-btn {
+  flex: 1 1 0;
+  border-radius: 9px;
+  padding: 13px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 46px;
+}
+
+.confirm-cancelar {
+  border: 1px solid #d8d6cc;
+  background: #fff;
+  color: #3a3f38;
+}
+
+.confirm-excluir {
+  border: none;
+  background: #c1443a;
+  color: #fff;
+}
+
+.confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Aviso de sucesso — some sozinho */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #1c2321;
+  color: #f5f6f3;
+  border-radius: 24px;
+  padding: 11px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(28, 35, 33, 0.25);
+  max-width: calc(100vw - 32px);
+  animation: toast-entra 0.18s ease-out;
+}
+
+@keyframes toast-entra {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
 .card {
   background: #ffffff;
   border: 1px solid #e6e4dc;
@@ -813,6 +983,12 @@ code {
   gap: 6px;
 }
 
+.pedido-top-acoes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .pedido-valor {
   font-weight: 600;
   font-size: 15px;
@@ -1007,6 +1183,8 @@ code {
 @media (max-width: 640px) {
   .app {
     padding: 14px 12px 40px;
+    /* espaço pra barra de abas fixa + faixa do gesto de home do iPhone */
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
   }
 
   .header {
@@ -1019,6 +1197,72 @@ code {
 
   .title {
     font-size: 23px;
+  }
+
+  /* as abas do topo dão lugar à barra fixa de baixo */
+  .tabs {
+    display: none;
+  }
+
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    background: #ffffff;
+    border-top: 1px solid #e6e4dc;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -2px 12px rgba(28, 35, 33, 0.06);
+  }
+
+  .toast {
+    bottom: calc(74px + env(safe-area-inset-bottom));
+  }
+
+  /* a confirmação sobe de baixo, perto do polegar */
+  .confirm-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .confirm-sheet {
+    max-width: none;
+    border-radius: 18px 18px 0 0;
+    padding: 22px 18px calc(22px + env(safe-area-inset-bottom));
+    animation: sheet-sobe 0.2s ease-out;
+  }
+
+  @keyframes sheet-sobe {
+    from {
+      transform: translateY(14px);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  /* alvos de toque: botões de texto eram pequenos demais pro dedo */
+  .text-btn {
+    padding: 10px 8px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .chip {
+    padding: 9px 15px;
+    min-height: 38px;
+  }
+
+  .item-remove {
+    padding: 10px;
+  }
+
+  .month-nav-btn {
+    width: 38px;
+    height: 38px;
   }
 
   .card {
@@ -1062,6 +1306,18 @@ code {
 
   .pedido-top {
     flex-wrap: wrap;
+  }
+
+  /* no celular a coluna da direita vira uma faixa própria embaixo do nome do
+     cliente: progresso/valor de um lado, botões do outro — empilhado
+     verticalmente comia altura demais numa tela pequena */
+  .pedido-top-right {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .pedido-actions {

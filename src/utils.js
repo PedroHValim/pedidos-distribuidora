@@ -22,8 +22,25 @@ export function formatData(iso) {
   return `${d}/${m}/${y}`
 }
 
+// Converte um Date pra "AAAA-MM-DD" usando o fuso do celular, não UTC.
+// Usar toISOString() aqui fazia um pedido registrado depois das 21h (horário
+// de Brasília) nascer com a data do dia seguinte, porque nesse horário já é
+// o outro dia em UTC.
+function isoLocal(d) {
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mes}-${dia}`
+}
+
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return isoLocal(new Date())
+}
+
+// "AAAA-MM-DD" de n dias atrás, contando hoje como o primeiro dia
+export function diasAtrasISO(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n + 1)
+  return isoLocal(d)
 }
 
 // Total de custo de um item (o que foi pago na compra), null se ainda não comprado
@@ -85,11 +102,11 @@ export function somarMeses({ ano, mes }, delta) {
 }
 
 export function primeiroDiaDoMes({ ano, mes }) {
-  return new Date(ano, mes - 1, 1).toISOString().slice(0, 10)
+  return isoLocal(new Date(ano, mes - 1, 1))
 }
 
 export function ultimoDiaDoMes({ ano, mes }) {
-  return new Date(ano, mes, 0).toISOString().slice(0, 10)
+  return isoLocal(new Date(ano, mes, 0))
 }
 
 // "2026-07" — pra comparar direto com o começo de uma data ISO (data.slice(0,7))

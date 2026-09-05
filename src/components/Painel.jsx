@@ -9,19 +9,11 @@ import {
   somarMeses,
   primeiroDiaDoMes,
   ultimoDiaDoMes,
+  todayISO,
+  diasAtrasISO,
 } from '../utils.js'
 
 const METODO_COLORS = ['#2F6F62', '#D98E04', '#3B82C4', '#8A5FBF', '#C1443A', '#B58A1E']
-
-function hoje() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function diasAtras(n) {
-  const d = new Date()
-  d.setDate(d.getDate() - n + 1)
-  return d.toISOString().slice(0, 10)
-}
 
 export default function Painel({ pedidos, clientes, metodosPagamento }) {
   const [clienteId, setClienteId] = useState('')
@@ -39,11 +31,11 @@ export default function Painel({ pedidos, clientes, metodosPagamento }) {
       setDataDe('')
       setDataAte('')
     } else if (preset === '7d') {
-      setDataDe(diasAtras(7))
-      setDataAte(hoje())
+      setDataDe(diasAtrasISO(7))
+      setDataAte(todayISO())
     } else if (preset === '30d') {
-      setDataDe(diasAtras(30))
-      setDataAte(hoje())
+      setDataDe(diasAtrasISO(30))
+      setDataAte(todayISO())
     }
   }
 

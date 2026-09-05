@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react'
-import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle } from 'lucide-react'
+import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle, X } from 'lucide-react'
 import { supabase, supabaseConfigurado } from './supabaseClient.js'
 import { normalizaProduto, metodoEhCredito } from './utils.js'
+import { ConfirmDialog, Toast } from './components/ui.jsx'
 import NovoPedido from './components/NovoPedido.jsx'
 import Compras from './components/Compras.jsx'
 import Pedidos from './components/Pedidos.jsx'
 import Painel from './components/Painel.jsx'
+
+// As abas aparecem em dois lugares: no topo (telas grandes) e numa barra
+// fixa embaixo no celular, onde o polegar alcança sem esticar a mão.
+// O CSS esconde uma ou outra conforme o tamanho da tela.
+const ABAS = [
+  { id: 'novo', label: 'Novo pedido', labelCurto: 'Novo', icone: Plus },
+  { id: 'compras', label: 'Compras', labelCurto: 'Compras', icone: ShoppingCart },
+  { id: 'pedidos', label: 'Pedidos', labelCurto: 'Pedidos', icone: ClipboardList },
+  { id: 'painel', label: 'Painel', labelCurto: 'Painel', icone: LayoutDashboard },
+]
 
 function TabButton({ icon, label, active, onClick }) {
   return (
@@ -30,12 +41,20 @@ export default function App() {
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [erro, setErro] = useState('')
   const [tab, setTab] = useState('novo')
+  const [aviso, setAviso] = useState('')
+  // Exclusão nunca acontece direto: guarda o que fazer aqui e mostra a
+  // confirmação. No celular é fácil demais encostar sem querer num botão.
+  const [confirmacao, setConfirmacao] = useState(null)
+  const [confirmando, setConfirmando] = useState(false)
 
   async function fetchPedidos() {
     const { data, error } = await supabase
       .from('pedidos')
       .select(PEDIDO_SELECT)
       .order('created_at', { ascending: false })
+      // sem isso os itens voltam em ordem imprevisível a cada consulta, e a
+      // lista da aba Compras trocava de ordem no meio do preenchimento
+      .order('created_at', { referencedTable: 'pedido_itens', ascending: true })
 
     if (error) setErro(error.message)
     else {
@@ -124,6 +143,7 @@ export default function App() {
     if (erroItens) setErro(erroItens.message)
     else {
       setErro('')
+      setAviso('Pedido registrado')
       setTab('compras')
       await registrarProdutosNovos(form.itens.map((it) => it.produto), produtos)
     }
@@ -132,17 +152,35 @@ export default function App() {
     setSalvando(false)
   }
 
+  // Aplica a mudança na tela na hora e só depois grava. Antes cada toque
+  // (marcar comprado, escolher parcela, sair do campo de preço) recarregava
+  // a lista inteira de pedidos do banco — no celular com sinal fraco isso
+  // dava um engasgo visível a cada interação. Se a gravação falhar, recarrega
+  // do banco pra desfazer o que foi mostrado.
   async function atualizarItem(itemId, patch) {
+    setPedidos((prev) =>
+      prev.map((p) => ({
+        ...p,
+        pedido_itens: (p.pedido_itens || []).map((it) => (it.id === itemId ? { ...it, ...patch } : it)),
+      }))
+    )
+
     const { error } = await supabase.from('pedido_itens').update(patch).eq('id', itemId)
-    if (error) setErro(error.message)
-    else setErro('')
-    await fetchPedidos()
+    if (error) {
+      setErro(error.message)
+      await fetchPedidos()
+    } else {
+      setErro('')
+    }
   }
 
   async function excluirItem(itemId) {
     const { error } = await supabase.from('pedido_itens').delete().eq('id', itemId)
     if (error) setErro(error.message)
-    else setErro('')
+    else {
+      setErro('')
+      setAviso('Item excluído')
+    }
     await fetchPedidos()
   }
 
@@ -239,7 +277,10 @@ export default function App() {
   async function completarPedido(pedidoId) {
     const { error } = await supabase.from('pedidos').update({ status: 'separado' }).eq('id', pedidoId)
     if (error) setErro(error.message)
-    else setErro('')
+    else {
+      setErro('')
+      setAviso('Pedido movido pra aba Pedidos')
+    }
     await fetchPedidos()
   }
 
@@ -247,15 +288,53 @@ export default function App() {
     const proximo = pedido.status === 'separado' ? 'entregue' : pedido.status
     const { error } = await supabase.from('pedidos').update({ status: proximo }).eq('id', pedido.id)
     if (error) setErro(error.message)
-    else setErro('')
+    else {
+      setErro('')
+      setAviso('Pedido marcado como entregue')
+    }
     await fetchPedidos()
   }
 
   async function excluirPedido(id) {
     const { error } = await supabase.from('pedidos').delete().eq('id', id)
     if (error) setErro(error.message)
-    else setErro('')
+    else {
+      setErro('')
+      setAviso('Pedido excluído')
+    }
     await fetchPedidos()
+  }
+
+  // As telas chamam estas funções no lugar de excluir direto — elas só abrem
+  // a confirmação, e a exclusão de verdade só roda se a pessoa confirmar.
+  function pedirExclusaoPedido(id) {
+    const pedido = pedidos.find((p) => p.id === id)
+    const cliente = pedido?.cliente?.nome
+    setConfirmacao({
+      titulo: 'Excluir este pedido?',
+      descricao: `${cliente ? `O pedido de ${cliente}` : 'O pedido'} e todos os seus itens serão apagados. Não dá pra desfazer.`,
+      acao: () => excluirPedido(id),
+    })
+  }
+
+  function pedirExclusaoItem(itemId) {
+    const item = pedidos.flatMap((p) => p.pedido_itens || []).find((it) => it.id === itemId)
+    setConfirmacao({
+      titulo: 'Excluir este item?',
+      descricao: item ? `"${item.produto}" sai deste pedido. Não dá pra desfazer.` : 'Não dá pra desfazer.',
+      acao: () => excluirItem(itemId),
+    })
+  }
+
+  async function executarConfirmacao() {
+    if (!confirmacao) return
+    setConfirmando(true)
+    try {
+      await confirmacao.acao()
+    } finally {
+      setConfirmando(false)
+      setConfirmacao(null)
+    }
   }
 
   if (!supabaseConfigurado) {
@@ -293,16 +372,25 @@ export default function App() {
           <h1 className="title">Distribuidora</h1>
         </div>
         <nav className="tabs">
-          <TabButton icon={<Plus size={16} />} label="Novo pedido" active={tab === 'novo'} onClick={() => setTab('novo')} />
-          <TabButton icon={<ShoppingCart size={16} />} label="Compras" active={tab === 'compras'} onClick={() => setTab('compras')} />
-          <TabButton icon={<ClipboardList size={16} />} label="Pedidos" active={tab === 'pedidos'} onClick={() => setTab('pedidos')} />
-          <TabButton icon={<LayoutDashboard size={16} />} label="Painel" active={tab === 'painel'} onClick={() => setTab('painel')} />
+          {ABAS.map(({ id, label, icone: Icone }) => (
+            <TabButton
+              key={id}
+              icon={<Icone size={16} />}
+              label={label}
+              active={tab === id}
+              onClick={() => setTab(id)}
+            />
+          ))}
         </nav>
       </header>
 
       {erro && (
         <div className="banner banner-erro">
-          <AlertCircle size={15} /> {erro}
+          <AlertCircle size={15} />
+          <span className="banner-texto">{erro}</span>
+          <button type="button" className="banner-fechar" onClick={() => setErro('')} aria-label="Fechar aviso de erro">
+            <X size={15} />
+          </button>
         </div>
       )}
 
@@ -326,9 +414,9 @@ export default function App() {
             produtos={produtos}
             salvandoEdicao={salvandoEdicao}
             onAtualizarItem={atualizarItem}
-            onExcluirItem={excluirItem}
+            onExcluirItem={pedirExclusaoItem}
             onCompletarPedido={completarPedido}
-            onExcluirPedido={excluirPedido}
+            onExcluirPedido={pedirExclusaoPedido}
             onEditarPedido={editarPedido}
           />
         )}
@@ -342,12 +430,39 @@ export default function App() {
             produtos={produtos}
             salvandoEdicao={salvandoEdicao}
             onAvancarStatus={avancarStatus}
-            onExcluirPedido={excluirPedido}
+            onExcluirPedido={pedirExclusaoPedido}
             onEditarPedido={editarPedido}
           />
         )}
         {tab === 'painel' && <Painel pedidos={pedidos} clientes={clientes} metodosPagamento={metodosPagamento} />}
       </main>
+
+      <nav className="bottom-nav">
+        {ABAS.map(({ id, labelCurto, icone: Icone }) => (
+          <button
+            key={id}
+            type="button"
+            className={`bottom-nav-btn ${tab === id ? 'bottom-nav-btn-active' : ''}`}
+            onClick={() => setTab(id)}
+            aria-current={tab === id ? 'page' : undefined}
+          >
+            <Icone size={20} />
+            <span>{labelCurto}</span>
+          </button>
+        ))}
+      </nav>
+
+      <Toast mensagem={aviso} onFechar={() => setAviso('')} />
+
+      {confirmacao && (
+        <ConfirmDialog
+          titulo={confirmacao.titulo}
+          descricao={confirmacao.descricao}
+          ocupado={confirmando}
+          onConfirmar={executarConfirmacao}
+          onCancelar={() => setConfirmacao(null)}
+        />
+      )}
     </div>
   )
 }

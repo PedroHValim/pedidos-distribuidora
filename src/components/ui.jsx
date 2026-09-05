@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { CheckCircle2, Circle, Truck, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CheckCircle2, Circle, Truck, ChevronLeft, ChevronRight, AlertTriangle, Check } from 'lucide-react'
 import { STATUS_COLOR, STATUS_LABEL, nomeMes, mesAtual, normalizaProduto } from '../utils.js'
 
 export function StatusBadge({ status }) {
@@ -34,6 +34,56 @@ export function StatCard({ label, value, accent }) {
 
 export function EmptyChart({ text }) {
   return <div className="empty-chart">{text}</div>
+}
+
+// Confirmação de ação destrutiva. No celular ela sobe de baixo (perto do
+// polegar) e o botão de cancelar vem primeiro, pra que o toque mais fácil
+// seja o que NÃO apaga nada — excluir pedido é irreversível.
+export function ConfirmDialog({ titulo, descricao, textoConfirmar = 'Excluir', ocupado, onConfirmar, onCancelar }) {
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') onCancelar()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onCancelar])
+
+  return (
+    <div className="confirm-overlay" onClick={onCancelar} role="presentation">
+      <div className="confirm-sheet" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-label={titulo}>
+        <div className="confirm-icone">
+          <AlertTriangle size={20} />
+        </div>
+        <h3 className="confirm-titulo">{titulo}</h3>
+        {descricao && <p className="confirm-descricao">{descricao}</p>}
+        <div className="confirm-acoes">
+          <button type="button" className="confirm-btn confirm-cancelar" onClick={onCancelar} disabled={ocupado}>
+            Cancelar
+          </button>
+          <button type="button" className="confirm-btn confirm-excluir" onClick={onConfirmar} disabled={ocupado}>
+            {ocupado ? 'Excluindo…' : textoConfirmar}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Aviso rápido de "deu certo" — some sozinho. Fica acima da barra de abas
+// do celular pra não cobrir os botões.
+export function Toast({ mensagem, onFechar }) {
+  useEffect(() => {
+    if (!mensagem) return
+    const t = setTimeout(onFechar, 2600)
+    return () => clearTimeout(t)
+  }, [mensagem, onFechar])
+
+  if (!mensagem) return null
+  return (
+    <div className="toast" role="status">
+      <Check size={15} /> {mensagem}
+    </div>
+  )
 }
 
 // Navegador de mês: sempre abre no mês atual, com setas pra ver meses anteriores.

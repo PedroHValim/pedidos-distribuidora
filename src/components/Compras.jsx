@@ -230,16 +230,18 @@ export default function Compras({
                   <div className="compra-progresso">
                     {itens.filter((it) => it.comprado).length}/{itens.length} comprados
                   </div>
-                  <button type="button" className="edit-pedido-btn" onClick={() => setEditandoId(pedido.id)}>
-                    <Pencil size={13} /> Editar
-                  </button>
-                  <button
-                    type="button"
-                    className="text-btn danger"
-                    onClick={() => onExcluirPedido(pedido.id)}
-                  >
-                    Excluir
-                  </button>
+                  <div className="pedido-top-acoes">
+                    <button type="button" className="edit-pedido-btn" onClick={() => setEditandoId(pedido.id)}>
+                      <Pencil size={13} /> Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="text-btn danger"
+                      onClick={() => onExcluirPedido(pedido.id)}
+                    >
+                      Excluir
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
