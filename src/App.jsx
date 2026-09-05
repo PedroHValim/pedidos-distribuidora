@@ -13,6 +13,7 @@ import PortalCliente from './components/PortalCliente.jsx'
 // estático no GitHub Pages: um caminho de verdade daria 404 ao recarregar a
 // página, já que não existe servidor pra redirecionar.
 const ROTA_PORTAL = '#/portal'
+const CHAVE_SESSAO_PORTAL = 'rav-portal-sessao'
 
 // As abas aparecem em dois lugares: no topo (telas grandes) e numa barra
 // fixa embaixo no celular, onde o polegar alcança sem esticar a mão.
@@ -53,6 +54,16 @@ export default function App() {
   const [confirmacao, setConfirmacao] = useState(null)
   const [confirmando, setConfirmando] = useState(false)
   const [rota, setRota] = useState(() => window.location.hash)
+  // Empresa logada no portal do cliente. Fica no localStorage pra não pedir
+  // senha toda vez — quem faz pedido costuma usar sempre o mesmo aparelho.
+  const [sessaoPortal, setSessaoPortal] = useState(() => {
+    try {
+      const salvo = localStorage.getItem(CHAVE_SESSAO_PORTAL)
+      return salvo ? JSON.parse(salvo) : null
+    } catch {
+      return null
+    }
+  })
 
   async function fetchPedidos() {
     const { data, error } = await supabase
@@ -115,9 +126,28 @@ export default function App() {
     // o mesmo produto ao mesmo tempo) — não vale a pena mostrar pro usuário
   }
 
+  // Só as listas que o portal público precisa pra montar um pedido. Nada de
+  // pedidos, formas de pagamento ou cartões: essas trazem preço de compra e
+  // dados internos, e o portal é aberto por gente de fora. A lista de
+  // CLIENTES também não vem: ela é a carteira da empresa, e o portal não
+  // precisa dela desde que o nome da empresa passou a vir da conta logada.
+  async function fetchListasPortal() {
+    const [unidadesRes, produtosRes] = await Promise.all([
+      supabase.from('unidades').select('id,nome').eq('ativo', true).order('nome'),
+      supabase.from('produtos').select('id,nome').eq('ativo', true).order('nome'),
+    ])
+    setUnidades(unidadesRes.data || [])
+    setProdutos(produtosRes.data || [])
+  }
+
   useEffect(() => {
+    // quem abre direto o portal nunca chega a baixar a tabela de pedidos
+    if (rota === ROTA_PORTAL) {
+      fetchListasPortal().then(() => setLoading(false))
+      return
+    }
     Promise.all([fetchPedidos(), fetchListasFixas()]).then(() => setLoading(false))
-  }, [])
+  }, [rota])
 
   useEffect(() => {
     const aoTrocarHash = () => setRota(window.location.hash)
@@ -165,47 +195,64 @@ export default function App() {
     setSalvando(false)
   }
 
-  // Descobre a qual cliente cadastrado um nome digitado se refere. O cliente
-  // escreve do jeito dele, então comparamos ignorando acento/maiúscula. Só
-  // cadastra um cliente novo quando realmente não existe nenhum parecido —
-  // é isso que mantém os filtros e o painel agrupando certo.
-  async function resolverClienteId(nomeDigitado) {
-    const alvo = normalizaTexto(nomeDigitado)
-    const existente = clientes.find((c) => normalizaTexto(c.nome) === alvo)
-    if (existente) return existente.id
+  // Cadastro/login do portal. A conferência da senha acontece na Edge
+  // Function (que usa a service_role): no navegador ela seria contornável, e
+  // a tabela de senhas ficaria legível por qualquer um.
+  async function autenticarPortal(acao, empresa, senha) {
+    const { data, error } = await supabase.functions.invoke('portal-auth', {
+      body: { acao, empresa, senha },
+    })
 
-    const { data, error } = await supabase.from('clientes').insert({ nome: nomeDigitado }).select().single()
-    // confere o id de verdade: sem isso, uma resposta fora do formato
-    // esperado seguia adiante e o pedido era gravado sem cliente_id
-    if (!error && data?.id) {
-      setClientes((prev) => [...prev, data].sort((a, b) => (a.nome || '').localeCompare(b.nome || '')))
-      return data.id
+    if (error) {
+      // a função responde 401/409 com uma mensagem própria; o supabase-js
+      // trata isso como erro e guarda a resposta original em error.context
+      let mensagem = 'Não consegui completar. Tente de novo em instantes.'
+      try {
+        const corpo = await error.context?.json()
+        if (corpo?.error) mensagem = corpo.error
+      } catch {
+        /* resposta sem corpo legível: fica a mensagem genérica */
+      }
+      throw new Error(mensagem)
     }
 
-    // o nome é único no banco: se deu conflito, alguém já cadastrou esse
-    // mesmo cliente enquanto isso — então é só buscar o registro existente
-    const { data: achado } = await supabase.from('clientes').select('id').ilike('nome', nomeDigitado).maybeSingle()
-    if (achado) return achado.id
+    if (data?.error) throw new Error(data.error)
+    if (!data?.sessao?.cliente_id) throw new Error('Resposta inesperada do servidor.')
 
-    throw new Error('Não consegui registrar a empresa. Confira o nome e tente de novo.')
+    setSessaoPortal(data.sessao)
+    try {
+      localStorage.setItem(CHAVE_SESSAO_PORTAL, JSON.stringify(data.sessao))
+    } catch {
+      /* navegador sem localStorage: a sessão vale só enquanto a aba estiver aberta */
+    }
+  }
+
+  function sairPortal() {
+    setSessaoPortal(null)
+    try {
+      localStorage.removeItem(CHAVE_SESSAO_PORTAL)
+    } catch {
+      /* nada a limpar */
+    }
   }
 
   // Grava um pedido vindo do portal do cliente. Cai como "comprando", igual a
   // um pedido digitado internamente, então aparece na aba Compras na hora.
+  // O cliente_id vem da conta em que a pessoa entrou — não de um nome
+  // digitado —, então o pedido sempre cai no cadastro certo.
   async function criarPedidoPortal(dadosPortal) {
-    const clienteId = await resolverClienteId(dadosPortal.empresa)
-    if (!clienteId) throw new Error('Não consegui identificar a empresa. Tente de novo.')
+    if (!sessaoPortal?.cliente_id) throw new Error('Sua sessão expirou. Entre de novo para enviar o pedido.')
 
     const { data: pedido, error: erroPedido } = await supabase
       .from('pedidos')
       .insert({
-        cliente_id: clienteId,
+        cliente_id: sessaoPortal.cliente_id,
         data_pedido: todayISO(),
         data_entrega: dadosPortal.entrega || null,
         obs: dadosPortal.obs || null,
         status: 'comprando',
         origem: 'portal',
-        empresa_digitada: dadosPortal.empresa,
+        empresa_digitada: sessaoPortal.nome_empresa,
         contato_nome: dadosPortal.responsavel,
         contato_telefone: dadosPortal.telefone,
         contato_email: dadosPortal.email || null,
@@ -420,9 +467,11 @@ export default function App() {
   if (rota === ROTA_PORTAL) {
     return (
       <PortalCliente
-        clientes={clientes}
+        sessao={sessaoPortal}
         unidades={unidades}
         produtos={produtos}
+        onAutenticar={autenticarPortal}
+        onSair={sairPortal}
         onEnviarPedido={criarPedidoPortal}
         onVoltar={() => {
           window.location.hash = ''

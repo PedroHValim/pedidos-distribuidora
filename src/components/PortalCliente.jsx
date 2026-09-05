@@ -7,6 +7,9 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  Heart,
+  Lock,
+  LogOut,
   Mail,
   MapPin,
   Phone,
@@ -33,82 +36,144 @@ const ETAPAS = [
 
 const itemVazio = (unidadeId) => ({ produto: '', quantidade: '', unidade_id: unidadeId })
 
-// Sugere empresas já cadastradas enquanto o cliente digita. Existe porque o
-// cliente escreve o nome do jeito dele ("cafe do ponto", "Café do Ponto Ltda")
-// e, sem isso, cada variação viraria um cadastro diferente — quebrando os
-// filtros e o painel do app interno, que agrupam por cliente.
-function EmpresaAutocomplete({ valor, onChange, clientes }) {
-  const [aberto, setAberto] = useState(false)
+// Tela de entrar / criar acesso. Fica no lugar do formulário enquanto a
+// empresa não estiver identificada: sem isso, qualquer visitante mandaria
+// pedido em nome de quem quisesse. Antes existia um autocompletar do nome da
+// empresa aqui, que foi removido de propósito — ele sugeria os clientes já
+// cadastrados e acabava mostrando a carteira de clientes pra quem digitasse
+// qualquer letra.
+function AcessoPortal({ onAutenticar }) {
+  const [modo, setModo] = useState('entrar')
+  const [empresa, setEmpresa] = useState('')
+  const [empresaConfirma, setEmpresaConfirma] = useState('')
+  const [senha, setSenha] = useState('')
+  const [erro, setErro] = useState('')
+  const [ocupado, setOcupado] = useState(false)
 
-  const termo = normalizaTexto(valor)
+  const ehCadastro = modo === 'cadastrar'
 
-  const sugestoes = useMemo(() => {
-    if (!termo) return []
-    return clientes.filter((c) => normalizaTexto(c.nome).includes(termo)).slice(0, 6)
-  }, [termo, clientes])
+  function trocarModo(novo) {
+    setModo(novo)
+    setErro('')
+    setEmpresaConfirma('')
+    setSenha('')
+  }
 
-  const exato = useMemo(
-    () => (termo ? clientes.find((c) => normalizaTexto(c.nome) === termo) : null),
-    [termo, clientes]
-  )
+  async function enviar(e) {
+    e.preventDefault()
+    if (ocupado) return
+    setErro('')
+
+    if (!empresa.trim()) return setErro('Informe o nome da empresa.')
+    if (ehCadastro && normalizaTexto(empresa) !== normalizaTexto(empresaConfirma)) {
+      return setErro('Os dois nomes de empresa precisam ser iguais.')
+    }
+    if (senha.length < 6) return setErro('A senha precisa ter pelo menos 6 caracteres.')
+
+    setOcupado(true)
+    try {
+      await onAutenticar(ehCadastro ? 'cadastrar' : 'entrar', empresa.trim(), senha)
+    } catch (err) {
+      setErro(err?.message || 'Não consegui completar. Tente de novo.')
+    } finally {
+      setOcupado(false)
+    }
+  }
 
   return (
-    <div className="rav-autocomplete">
-      <input
-        className="rav-input"
-        value={valor}
-        onChange={(e) => {
-          onChange(e.target.value)
-          setAberto(true)
-        }}
-        onFocus={() => setAberto(true)}
-        onBlur={() => setTimeout(() => setAberto(false), 150)}
-        placeholder="Nome do estabelecimento"
-        autoComplete="organization"
-      />
+    <form className="rav-card-form rav-acesso" onSubmit={enviar}>
+      <div className="rav-acesso-abas">
+        <button
+          type="button"
+          className={`rav-acesso-aba ${!ehCadastro ? 'rav-acesso-aba-ativa' : ''}`}
+          onClick={() => trocarModo('entrar')}
+        >
+          Entrar
+        </button>
+        <button
+          type="button"
+          className={`rav-acesso-aba ${ehCadastro ? 'rav-acesso-aba-ativa' : ''}`}
+          onClick={() => trocarModo('cadastrar')}
+        >
+          Criar acesso
+        </button>
+      </div>
 
-      {aberto && sugestoes.length > 0 && !exato && (
-        <ul className="rav-sugestoes">
-          {sugestoes.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onChange(c.nome)
-                  setAberto(false)
-                }}
-              >
-                <Building2 size={14} /> {c.nome}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <p className="rav-acesso-texto">
+        {ehCadastro
+          ? 'Cadastre o nome da sua empresa e uma senha. Você vai usar os dois sempre que for fazer um pedido.'
+          : 'Entre com o nome da sua empresa e a senha que você cadastrou.'}
+      </p>
 
-      {exato ? (
-        <span className="rav-dica rav-dica-ok">
-          <Check size={13} /> Identificamos seu cadastro: {exato.nome}
+      <label className="rav-campo">
+        <span>
+          Nome da empresa <em>*</em>
         </span>
-      ) : (
-        termo.length > 2 && (
-          <span className="rav-dica">
-            {sugestoes.length > 0
-              ? 'É uma dessas acima? Toque para selecionar.'
-              : 'Primeiro pedido? Seguimos com este nome mesmo.'}
+        <input
+          className="rav-input"
+          value={empresa}
+          onChange={(e) => setEmpresa(e.target.value)}
+          placeholder="Como sua empresa é conhecida"
+          autoComplete="organization"
+        />
+      </label>
+
+      {ehCadastro && (
+        <label className="rav-campo">
+          <span>
+            Confirme o nome da empresa <em>*</em>
           </span>
-        )
+          <input
+            className="rav-input"
+            value={empresaConfirma}
+            onChange={(e) => setEmpresaConfirma(e.target.value)}
+            placeholder="Digite de novo, igual"
+            autoComplete="off"
+          />
+        </label>
       )}
-    </div>
+
+      <label className="rav-campo">
+        <span>
+          Senha <em>*</em>
+        </span>
+        <input
+          className="rav-input"
+          type="password"
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
+          placeholder={ehCadastro ? 'Mínimo de 6 caracteres' : 'Sua senha'}
+          autoComplete={ehCadastro ? 'new-password' : 'current-password'}
+        />
+      </label>
+
+      {erro && <p className="rav-erro">{erro}</p>}
+
+      <button type="submit" className="rav-btn rav-btn-primario rav-acesso-btn" disabled={ocupado}>
+        {ocupado ? 'Aguarde…' : ehCadastro ? 'Criar acesso' : 'Entrar'}
+        {!ocupado && <ArrowRight size={16} />}
+      </button>
+
+      <p className="rav-acesso-rodape">
+        <Lock size={12} /> Sua senha é guardada criptografada. Não pedimos CNPJ nem dados bancários.
+      </p>
+    </form>
   )
 }
 
-export default function PortalCliente({ clientes = [], unidades = [], produtos = [], onEnviarPedido, onVoltar }) {
+export default function PortalCliente({
+  sessao,
+  unidades = [],
+  produtos = [],
+  onAutenticar,
+  onSair,
+  onEnviarPedido,
+  onVoltar,
+}) {
   const unidadeIdPadrao = unidadePadraoId(unidades)
 
   const [etapa, setEtapa] = useState(1)
   const [dados, setDados] = useState({
-    empresa: '',
     responsavel: '',
     telefone: '',
     email: '',
@@ -135,7 +200,7 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
     setItens((lista) => (lista.length > 1 ? lista.filter((_, i) => i !== idx) : lista))
   }
 
-  const dadosOk = dados.empresa.trim() && dados.responsavel.trim() && dados.telefone.trim()
+  const dadosOk = dados.responsavel.trim() && dados.telefone.trim()
   const itensValidos = useMemo(
     () => itens.filter((it) => it.produto.trim() && Number(it.quantidade) > 0 && it.unidade_id),
     [itens]
@@ -167,7 +232,6 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
     setEnviando(true)
     try {
       await onEnviarPedido({
-        empresa: dados.empresa.trim(),
         responsavel: dados.responsavel.trim(),
         telefone: dados.telefone.trim(),
         email: dados.email.trim(),
@@ -181,7 +245,7 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
       })
       // guarda o resumo antes de limpar, pra mostrar na tela de confirmação
       setResumoEnviado({
-        empresa: dados.empresa.trim(),
+        empresa: sessao?.nome_empresa || '',
         telefone: dados.telefone.trim(),
         itens: itensValidos.map((it) => ({
           produto: it.produto.trim(),
@@ -205,7 +269,7 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
     setItens([itemVazio(unidadeIdPadrao)])
     setObs('')
     setErroEnvio('')
-    setDados({ empresa: '', responsavel: '', telefone: '', email: '', entrega: '' })
+    setDados({ responsavel: '', telefone: '', email: '', entrega: '' })
   }
 
   function irPara(id) {
@@ -239,9 +303,20 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
           </nav>
 
           <div className="rav-topbar-acoes">
-            <button type="button" className="rav-btn rav-btn-primario rav-btn-sm" onClick={() => irPara('pedido')}>
-              Fazer pedido
-            </button>
+            {sessao ? (
+              <>
+                <span className="rav-logado" title={sessao.nome_empresa}>
+                  <Building2 size={13} /> {sessao.nome_empresa}
+                </span>
+                <button type="button" className="rav-sair" onClick={onSair} title="Sair da conta">
+                  <LogOut size={14} />
+                </button>
+              </>
+            ) : (
+              <button type="button" className="rav-btn rav-btn-primario rav-btn-sm" onClick={() => irPara('pedido')}>
+                Fazer pedido
+              </button>
+            )}
             {onVoltar && (
               <button type="button" className="rav-voltar-app" onClick={onVoltar} title="Voltar para o app interno">
                 <ArrowLeft size={15} /> App
@@ -410,10 +485,28 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
             <div className="rav-container rav-form-wrap">
               <div className="rav-form-cabecalho">
                 <span className="rav-secao-eyebrow">Fazer pedido</span>
-                <h2 className="rav-secao-titulo">Monte seu pedido</h2>
-                <p className="rav-secao-texto">Leva menos de dois minutos. Não precisa de cadastro nem senha.</p>
+                <h2 className="rav-secao-titulo">{sessao ? 'Monte seu pedido' : 'Entre para fazer seu pedido'}</h2>
+                <p className="rav-secao-texto">
+                  {sessao
+                    ? 'Leva menos de dois minutos.'
+                    : 'Identifique sua empresa para continuar. Se ainda não tem acesso, crie em alguns segundos.'}
+                </p>
               </div>
 
+              {!sessao && <AcessoPortal onAutenticar={onAutenticar} />}
+
+              {sessao && (
+                <div className="rav-boas-vindas">
+                  <Heart size={16} />
+                  <div>
+                    <strong>Obrigado por ser nosso colaborador, {sessao.nome_empresa}!</strong>
+                    <span>Seu pedido já vai registrado no nome da sua empresa.</span>
+                  </div>
+                </div>
+              )}
+
+              {sessao && (
+                <>
               <ol className="rav-stepper">
                 {ETAPAS.map(({ n, titulo, icone: Icone }) => (
                   <li
@@ -439,16 +532,15 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
                 {etapa === 1 && (
                   <div className="rav-etapa">
                     <div className="rav-grid-2">
-                      <label className="rav-campo">
-                        <span>
-                          Empresa <em>*</em>
-                        </span>
-                        <EmpresaAutocomplete
-                          valor={dados.empresa}
-                          onChange={(v) => setCampo('empresa', v)}
-                          clientes={clientes}
-                        />
-                      </label>
+                      {/* a empresa vem da conta em que a pessoa entrou, não é
+                          digitada — é o que garante que o pedido cai no
+                          cadastro certo e que ninguém pede em nome de outro */}
+                      <div className="rav-campo">
+                        <span>Empresa</span>
+                        <div className="rav-campo-fixo">
+                          <Building2 size={15} /> {sessao?.nome_empresa}
+                        </div>
+                      </div>
                       <label className="rav-campo">
                         <span>
                           Responsável <em>*</em>
@@ -598,7 +690,7 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
                         <dl>
                           <div>
                             <dt>Empresa</dt>
-                            <dd>{dados.empresa}</dd>
+                            <dd>{sessao?.nome_empresa}</dd>
                           </div>
                           <div>
                             <dt>Responsável</dt>
@@ -679,6 +771,8 @@ export default function PortalCliente({ clientes = [], unidades = [], produtos =
                   )}
                 </div>
               </div>
+                </>
+              )}
             </div>
           </section>
         </main>

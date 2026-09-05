@@ -592,68 +592,158 @@
   margin-top: 18px;
 }
 
-/* Autocompletar de empresa: sugere cadastros existentes enquanto digita */
-.rav-autocomplete {
-  position: relative;
-}
-
-.rav-sugestoes {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 30;
-  background: var(--branco);
-  border: 1px solid var(--borda);
-  border-radius: 10px;
-  box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.28);
-  list-style: none;
-  margin: 0;
-  padding: 5px;
-  max-height: 232px;
-  overflow-y: auto;
-}
-
-.rav-sugestoes button {
+/* Empresa logada, mostrada no lugar de um campo digitável */
+.rav-campo-fixo {
   display: flex;
   align-items: center;
-  gap: 9px;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: none;
-  padding: 10px 11px;
-  border-radius: 7px;
-  font-size: 14.5px;
-  color: var(--tinta);
-  cursor: pointer;
-}
-
-.rav-sugestoes button:hover,
-.rav-sugestoes button:focus-visible {
+  gap: 8px;
+  border: 1px solid var(--azul-borda);
   background: var(--azul-claro);
+  border-radius: 9px;
+  padding: 11px 13px;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--azul-forte);
 }
 
-.rav-sugestoes svg {
+.rav-campo-fixo svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+/* Entrar / criar acesso */
+.rav-acesso {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.rav-acesso-abas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: 11px;
+  padding: 4px;
+  margin-bottom: 18px;
+}
+
+.rav-acesso-aba {
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tinta-media);
+  cursor: pointer;
+  min-height: 42px;
+}
+
+.rav-acesso-aba-ativa {
+  background: var(--branco);
+  color: var(--azul-forte);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+
+.rav-acesso-texto {
+  font-size: 13.5px;
+  color: var(--tinta-media);
+  margin-bottom: 18px;
+}
+
+.rav-acesso .rav-campo {
+  margin-bottom: 14px;
+}
+
+.rav-acesso-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.rav-acesso-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 12px;
   color: var(--tinta-fraca);
+  text-align: center;
+}
+
+/* Boas-vindas de quem já entrou */
+.rav-boas-vindas {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(120deg, var(--azul-forte) 0%, var(--azul) 100%);
+  color: #fff;
+  border-radius: 13px;
+  padding: 16px 18px;
+  margin-bottom: 8px;
+}
+
+.rav-boas-vindas svg {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.rav-boas-vindas div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rav-boas-vindas strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.rav-boas-vindas span {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* Empresa identificada na barra do topo */
+.rav-logado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 190px;
+  background: var(--azul-claro);
+  border: 1px solid var(--azul-borda);
+  color: var(--azul-forte);
+  border-radius: 20px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rav-sair {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--borda);
+  background: var(--branco);
+  border-radius: 9px;
+  color: var(--tinta-fraca);
+  cursor: pointer;
   flex-shrink: 0;
 }
 
-.rav-dica {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 6px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--tinta-fraca);
+.rav-sair:hover {
+  color: #dc2626;
+  border-color: #fecaca;
 }
 
-.rav-dica-ok {
-  color: #15803d;
-  font-weight: 600;
-}
+
 
 .rav-input {
   width: 100%;
