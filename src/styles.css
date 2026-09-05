@@ -169,6 +169,67 @@ code {
   margin: 0 0 18px;
 }
 
+.wpp-import {
+  background: #f2f8f5;
+  border: 1px solid #cfe3d9;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.wpp-import-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #2f6f62;
+  margin-bottom: 8px;
+}
+
+.wpp-import-textarea {
+  width: 100%;
+  border: 1px solid #cfe3d9;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  font-family: 'Inter', sans-serif;
+  background: #fff;
+  resize: vertical;
+}
+
+.wpp-import-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.wpp-import-erro {
+  font-size: 12px;
+  color: #c1443a;
+  flex: 1 1 auto;
+}
+
+.wpp-import-btn {
+  border: none;
+  background: #2f6f62;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.wpp-import-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .row-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -972,6 +1033,7 @@ code {
   .item-unidade,
   .item-preco-compra,
   .item-metodo-compra,
+  .wpp-import-textarea,
   .search-input {
     font-size: 16px;
   }

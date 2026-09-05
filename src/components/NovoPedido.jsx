@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, MessageCircle } from 'lucide-react'
 import { Field, ProdutoAutocomplete } from './ui.jsx'
+import { supabase } from '../supabaseClient.js'
 import { todayISO } from '../utils.js'
 
 const novoItem = (unidadeIdPadrao) => ({ produto: '', quantidade: '', unidade_id: unidadeIdPadrao || '' })
@@ -15,6 +16,9 @@ const pedidoVazio = (unidadeIdPadrao) => ({
 export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades, produtos }) {
   const unidadeIdPadrao = unidades[0]?.id || ''
   const [form, setForm] = useState(() => pedidoVazio(unidadeIdPadrao))
+  const [textoWpp, setTextoWpp] = useState('')
+  const [gerando, setGerando] = useState(false)
+  const [erroGeracao, setErroGeracao] = useState('')
   // guarda síncrona: o estado `salvando` do App só chega no próximo render,
   // então um duplo toque rápido no botão passa pelo `disabled` antes dele
   // atualizar. Essa ref bloqueia o segundo envio na hora, sem esperar o React.
@@ -32,6 +36,43 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
   }
   function removeItem(idx) {
     setForm((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }))
+  }
+
+  // Manda o texto colado (ex: mensagem do WhatsApp) pra Edge Function, que
+  // usa IA pra extrair cliente/itens/data e devolve pronto pra revisão —
+  // só preenche o formulário, não salva nada sozinho. A pessoa ainda confere
+  // e clica em "Salvar pedido" como sempre.
+  async function gerarPedidoAutomatico() {
+    if (!textoWpp.trim() || gerando) return
+    setGerando(true)
+    setErroGeracao('')
+
+    const { data, error } = await supabase.functions.invoke('gerar-pedido', {
+      body: { texto: textoWpp, clientes, produtos, unidades },
+    })
+
+    setGerando(false)
+
+    if (error || data?.error || !data?.resultado) {
+      setErroGeracao('Não consegui ler essa mensagem. Preencha manualmente abaixo.')
+      return
+    }
+
+    const r = data.resultado
+    setForm({
+      cliente_id: r.cliente_id || '',
+      data_pedido: todayISO(),
+      data_entrega: r.data_entrega || '',
+      obs: r.observacao || '',
+      itens: r.itens.length
+        ? r.itens.map((it) => ({
+            produto: (it.produto_id && produtos.find((p) => p.id === it.produto_id)?.nome) || it.produto,
+            quantidade: it.quantidade != null ? it.quantidade : '',
+            unidade_id: it.unidade_id || unidadeIdPadrao,
+          }))
+        : [novoItem(unidadeIdPadrao)],
+    })
+    setTextoWpp('')
   }
 
   async function salvar(e) {
@@ -58,6 +99,30 @@ export default function NovoPedido({ onCriarPedido, salvando, clientes, unidades
       <p className="card-subtitle">
         Anote o que o cliente pediu. O preço de compra e a separação dos itens ficam para a aba "Compras".
       </p>
+
+      <div className="wpp-import">
+        <div className="wpp-import-label">
+          <MessageCircle size={14} /> Colar mensagem do WhatsApp (opcional)
+        </div>
+        <textarea
+          className="wpp-import-textarea"
+          placeholder="Cole aqui a mensagem do pedido que o cliente mandou..."
+          value={textoWpp}
+          onChange={(e) => setTextoWpp(e.target.value)}
+          rows={3}
+        />
+        <div className="wpp-import-actions">
+          {erroGeracao && <span className="wpp-import-erro">{erroGeracao}</span>}
+          <button
+            type="button"
+            className="wpp-import-btn"
+            onClick={gerarPedidoAutomatico}
+            disabled={!textoWpp.trim() || gerando}
+          >
+            {gerando ? 'Lendo mensagem…' : 'Preencher automaticamente'}
+          </button>
+        </div>
+      </div>
 
       <div className="row-fields">
         <Field label="Cliente">
