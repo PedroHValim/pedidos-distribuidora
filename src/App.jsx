@@ -526,10 +526,6 @@ export default function App() {
         onSair={sairPortal}
         onBuscarPedidos={buscarPedidosPortal}
         onEnviarPedido={criarPedidoPortal}
-        onVoltar={() => {
-          window.location.hash = ''
-          window.scrollTo({ top: 0 })
-        }}
       />
     )
   }

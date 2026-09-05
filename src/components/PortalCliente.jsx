@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
@@ -52,6 +52,10 @@ function AcessoPortal({ onAutenticar }) {
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  // trava síncrona contra toque duplo: o `ocupado` do estado só vale no
+  // próximo render, então dois toques rápidos passavam os dois pela checagem
+  // e disparavam duas requisições (dois cadastros, no pior caso)
+  const enviandoRef = useRef(false)
 
   const ehCadastro = modo === 'cadastrar'
 
@@ -64,7 +68,7 @@ function AcessoPortal({ onAutenticar }) {
 
   async function enviar(e) {
     e.preventDefault()
-    if (ocupado) return
+    if (enviandoRef.current) return
     setErro('')
 
     if (!empresa.trim()) return setErro('Informe o nome da empresa.')
@@ -73,12 +77,14 @@ function AcessoPortal({ onAutenticar }) {
     }
     if (senha.length < 6) return setErro('A senha precisa ter pelo menos 6 caracteres.')
 
+    enviandoRef.current = true
     setOcupado(true)
     try {
       await onAutenticar(ehCadastro ? 'cadastrar' : 'entrar', empresa.trim(), senha)
     } catch (err) {
       setErro(err?.message || 'Não consegui completar. Tente de novo.')
     } finally {
+      enviandoRef.current = false
       setOcupado(false)
     }
   }
@@ -259,10 +265,32 @@ export default function PortalCliente({
   onSair,
   onBuscarPedidos,
   onEnviarPedido,
-  onVoltar,
 }) {
+  // O portal e o app interno moram no mesmo endereço, e o manifest do PWA
+  // fica na raiz apontando pra lá (start_url "./"). Sem isto, um cliente que
+  // aceitasse "Adicionar à Tela de Início" no celular acabaria com um ícone
+  // chamado "Pedidos — Distribuidora" que abre o app interno. Enquanto o
+  // portal não tiver endereço próprio, tiramos o manifest da página dele —
+  // assim o navegador não oferece a instalação — e ajustamos o título da aba.
+  useEffect(() => {
+    const tituloAnterior = document.title
+    document.title = 'RAV Distribuidora — Faça seu pedido'
+
+    const link = document.querySelector('link[rel="manifest"]')
+    const pai = link?.parentNode
+    if (link && pai) pai.removeChild(link)
+
+    return () => {
+      document.title = tituloAnterior
+      if (link && pai) pai.appendChild(link)
+    }
+  }, [])
+
   // muda depois de cada pedido enviado, pra o histórico recarregar sozinho
   const [versaoHistorico, setVersaoHistorico] = useState(0)
+  // trava síncrona contra toque duplo — sem ela, dois toques rápidos no
+  // "Enviar pedido" gravavam o mesmo pedido duas vezes
+  const enviandoPedidoRef = useRef(false)
   const unidadeIdPadrao = unidadePadraoId(unidades)
 
   const [etapa, setEtapa] = useState(1)
@@ -320,7 +348,8 @@ export default function PortalCliente({
   }
 
   async function enviar() {
-    if (enviando) return
+    if (enviandoPedidoRef.current) return
+    enviandoPedidoRef.current = true
     setErroEnvio('')
     setEnviando(true)
     try {
@@ -352,6 +381,7 @@ export default function PortalCliente({
     } catch (err) {
       setErroEnvio(err?.message || 'Não consegui enviar o pedido. Tente de novo em instantes.')
     } finally {
+      enviandoPedidoRef.current = false
       setEnviando(false)
     }
   }
@@ -414,11 +444,6 @@ export default function PortalCliente({
             ) : (
               <button type="button" className="rav-btn rav-btn-primario rav-btn-sm" onClick={() => irPara('pedido')}>
                 Fazer pedido
-              </button>
-            )}
-            {onVoltar && (
-              <button type="button" className="rav-voltar-app" onClick={onVoltar} title="Voltar para o app interno">
-                <ArrowLeft size={15} /> App
               </button>
             )}
           </div>
