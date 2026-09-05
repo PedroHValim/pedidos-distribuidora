@@ -992,6 +992,42 @@ code {
   font-family: 'Space Grotesk', sans-serif;
 }
 
+/* marca de pedido que veio do portal do cliente */
+.origem-portal {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+  margin-left: 8px;
+  background: #e8f0fd;
+  color: #1d4ed8;
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.pedido-contato {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #8a9089;
+}
+
+.pedido-contato-tel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #2f6f62;
+  text-decoration: none;
+}
+
 .pedido-datas {
   font-size: 13.5px;
   font-weight: 700;

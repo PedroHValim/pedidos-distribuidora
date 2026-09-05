@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { PackageCheck, Pencil, ShoppingCart, Trash2 } from 'lucide-react'
+import { Globe, PackageCheck, Pencil, Phone, ShoppingCart, Trash2 } from 'lucide-react'
 import EditarPedidoForm from './EditarPedidoForm.jsx'
-import { currency, formatData, normalizaProduto, itemCustoTotal, metodoEhCredito } from '../utils.js'
+import { currency, formatData, normalizaTexto, itemCustoTotal, metodoEhCredito } from '../utils.js'
 
 const PARCELAS_OPCOES = [1, 2, 3, 4, 6, 10, 12]
 
@@ -12,11 +12,11 @@ function useEstatisticasPreco(todosPedidos) {
   return useMemo(() => {
     const todosItens = todosPedidos.flatMap((p) => p.pedido_itens || [])
     return (produto, excluirItemId) => {
-      const nome = normalizaProduto(produto)
+      const nome = normalizaTexto(produto)
       const valores = todosItens
         .filter(
           (it) =>
-            normalizaProduto(it.produto) === nome &&
+            normalizaTexto(it.produto) === nome &&
             it.comprado &&
             it.preco_compra != null &&
             it.id !== excluirItemId
@@ -219,11 +219,30 @@ export default function Compras({
           <div key={pedido.id} className="pedido-card">
             <div className="pedido-top">
               <div>
-                <div className="pedido-cliente">{pedido.cliente?.nome}</div>
+                <div className="pedido-cliente">
+                  {pedido.cliente?.nome}
+                  {pedido.origem === 'portal' && (
+                    <span className="origem-portal" title="Pedido feito pelo próprio cliente no portal">
+                      <Globe size={11} /> Portal
+                    </span>
+                  )}
+                </div>
                 <div className="pedido-datas">
                   Pedido em {formatData(pedido.data_pedido)}
                   {pedido.data_entrega && ` · entrega ${formatData(pedido.data_entrega)}`}
                 </div>
+                {/* nos pedidos do portal ninguém da equipe falou com o cliente,
+                    então o contato dele fica à mão pra confirmar o pedido */}
+                {pedido.origem === 'portal' && pedido.contato_nome && (
+                  <div className="pedido-contato">
+                    {pedido.contato_nome}
+                    {pedido.contato_telefone && (
+                      <a className="pedido-contato-tel" href={`tel:${pedido.contato_telefone.replace(/\D/g, '')}`}>
+                        <Phone size={11} /> {pedido.contato_telefone}
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
               {!editando && (
                 <div className="pedido-top-right">

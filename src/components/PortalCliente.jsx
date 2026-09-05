@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
+  Building2,
   Check,
   CheckCircle2,
   ClipboardList,
@@ -11,19 +12,18 @@ import {
   Phone,
   Plus,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Truck,
   UserRound,
 } from 'lucide-react'
-import { todayISO } from '../utils.js'
+import { normalizaTexto, todayISO, unidadePadraoId } from '../utils.js'
 import '../portal.css'
 
 // Página voltada pro CLIENTE fazer o próprio pedido, em vez de mandar
 // mensagem no WhatsApp pra alguém digitar depois. É outro produto visual do
 // app interno: azul/branco, tom institucional, e o formulário é o centro da
-// página. Por enquanto é só protótipo — o envio ainda não grava no banco.
-
-const UNIDADES_FALLBACK = ['UNIDADES', 'KILO', 'PACOTES', 'CAIXAS', 'SACOS', 'FARDOS']
+// página. O pedido gravado aqui cai direto na aba "Compras" do app interno.
 
 const ETAPAS = [
   { n: 1, titulo: 'Seus dados', icone: UserRound },
@@ -31,11 +31,80 @@ const ETAPAS = [
   { n: 3, titulo: 'Revisão', icone: CheckCircle2 },
 ]
 
-const itemVazio = (unidade) => ({ produto: '', quantidade: '', unidade })
+const itemVazio = (unidadeId) => ({ produto: '', quantidade: '', unidade_id: unidadeId })
 
-export default function PortalCliente({ unidades = [], produtos = [], onVoltar }) {
-  const listaUnidades = unidades.length ? unidades.map((u) => u.nome) : UNIDADES_FALLBACK
-  const unidadePadrao = listaUnidades.includes('UNIDADES') ? 'UNIDADES' : listaUnidades[0]
+// Sugere empresas já cadastradas enquanto o cliente digita. Existe porque o
+// cliente escreve o nome do jeito dele ("cafe do ponto", "Café do Ponto Ltda")
+// e, sem isso, cada variação viraria um cadastro diferente — quebrando os
+// filtros e o painel do app interno, que agrupam por cliente.
+function EmpresaAutocomplete({ valor, onChange, clientes }) {
+  const [aberto, setAberto] = useState(false)
+
+  const termo = normalizaTexto(valor)
+
+  const sugestoes = useMemo(() => {
+    if (!termo) return []
+    return clientes.filter((c) => normalizaTexto(c.nome).includes(termo)).slice(0, 6)
+  }, [termo, clientes])
+
+  const exato = useMemo(
+    () => (termo ? clientes.find((c) => normalizaTexto(c.nome) === termo) : null),
+    [termo, clientes]
+  )
+
+  return (
+    <div className="rav-autocomplete">
+      <input
+        className="rav-input"
+        value={valor}
+        onChange={(e) => {
+          onChange(e.target.value)
+          setAberto(true)
+        }}
+        onFocus={() => setAberto(true)}
+        onBlur={() => setTimeout(() => setAberto(false), 150)}
+        placeholder="Nome do estabelecimento"
+        autoComplete="organization"
+      />
+
+      {aberto && sugestoes.length > 0 && !exato && (
+        <ul className="rav-sugestoes">
+          {sugestoes.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(c.nome)
+                  setAberto(false)
+                }}
+              >
+                <Building2 size={14} /> {c.nome}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {exato ? (
+        <span className="rav-dica rav-dica-ok">
+          <Check size={13} /> Identificamos seu cadastro: {exato.nome}
+        </span>
+      ) : (
+        termo.length > 2 && (
+          <span className="rav-dica">
+            {sugestoes.length > 0
+              ? 'É uma dessas acima? Toque para selecionar.'
+              : 'Primeiro pedido? Seguimos com este nome mesmo.'}
+          </span>
+        )
+      )}
+    </div>
+  )
+}
+
+export default function PortalCliente({ clientes = [], unidades = [], produtos = [], onEnviarPedido, onVoltar }) {
+  const unidadeIdPadrao = unidadePadraoId(unidades)
 
   const [etapa, setEtapa] = useState(1)
   const [dados, setDados] = useState({
@@ -45,10 +114,13 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
     email: '',
     entrega: '',
   })
-  const [itens, setItens] = useState(() => [itemVazio(unidadePadrao)])
+  const [itens, setItens] = useState([itemVazio('')])
   const [obs, setObs] = useState('')
   const [enviado, setEnviado] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const [erroEnvio, setErroEnvio] = useState('')
   const [tentouAvancar, setTentouAvancar] = useState(false)
+  const [resumoEnviado, setResumoEnviado] = useState(null)
 
   function setCampo(campo, valor) {
     setDados((d) => ({ ...d, [campo]: valor }))
@@ -57,7 +129,7 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
     setItens((lista) => lista.map((it, i) => (i === idx ? { ...it, [campo]: valor } : it)))
   }
   function addItem() {
-    setItens((lista) => [...lista, itemVazio(unidadePadrao)])
+    setItens((lista) => [...lista, itemVazio(unidadeIdPadrao)])
   }
   function removeItem(idx) {
     setItens((lista) => (lista.length > 1 ? lista.filter((_, i) => i !== idx) : lista))
@@ -65,10 +137,14 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
 
   const dadosOk = dados.empresa.trim() && dados.responsavel.trim() && dados.telefone.trim()
   const itensValidos = useMemo(
-    () => itens.filter((it) => it.produto.trim() && Number(it.quantidade) > 0),
+    () => itens.filter((it) => it.produto.trim() && Number(it.quantidade) > 0 && it.unidade_id),
     [itens]
   )
   const itensOk = itensValidos.length > 0
+
+  function nomeUnidade(id) {
+    return unidades.find((u) => u.id === id)?.nome || ''
+  }
 
   function avancar() {
     setTentouAvancar(true)
@@ -80,27 +156,66 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
   }
   function voltarEtapa() {
     setTentouAvancar(false)
+    setErroEnvio('')
     setEtapa((e) => Math.max(1, e - 1))
     document.getElementById('pedido')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  function enviar() {
-    // protótipo: ainda não grava nada, só mostra a confirmação
-    setEnviado(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  async function enviar() {
+    if (enviando) return
+    setErroEnvio('')
+    setEnviando(true)
+    try {
+      await onEnviarPedido({
+        empresa: dados.empresa.trim(),
+        responsavel: dados.responsavel.trim(),
+        telefone: dados.telefone.trim(),
+        email: dados.email.trim(),
+        entrega: dados.entrega,
+        obs: obs.trim(),
+        itens: itensValidos.map((it) => ({
+          produto: it.produto.trim(),
+          quantidade: Number(it.quantidade),
+          unidade_id: it.unidade_id,
+        })),
+      })
+      // guarda o resumo antes de limpar, pra mostrar na tela de confirmação
+      setResumoEnviado({
+        empresa: dados.empresa.trim(),
+        telefone: dados.telefone.trim(),
+        itens: itensValidos.map((it) => ({
+          produto: it.produto.trim(),
+          quantidade: it.quantidade,
+          unidade: nomeUnidade(it.unidade_id),
+        })),
+      })
+      setEnviado(true)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (err) {
+      setErroEnvio(err?.message || 'Não consegui enviar o pedido. Tente de novo em instantes.')
+    } finally {
+      setEnviando(false)
+    }
   }
 
   function novoPedido() {
     setEnviado(false)
+    setResumoEnviado(null)
     setEtapa(1)
-    setItens([itemVazio(unidadePadrao)])
+    setItens([itemVazio(unidadeIdPadrao)])
     setObs('')
+    setErroEnvio('')
     setDados({ empresa: '', responsavel: '', telefone: '', email: '', entrega: '' })
   }
 
   function irPara(id) {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+
+  // Se as unidades ainda não carregaram, o pedido não tem como ser gravado
+  // (a tabela exige a unidade de cada item), então avisamos em vez de deixar
+  // a pessoa preencher tudo e falhar no fim.
+  const semUnidades = unidades.length === 0
 
   return (
     <div className="rav">
@@ -136,21 +251,21 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
         </div>
       </header>
 
-      {enviado ? (
+      {enviado && resumoEnviado ? (
         <main className="rav-container rav-sucesso">
           <div className="rav-sucesso-icone">
             <Check size={30} />
           </div>
           <h1>Pedido enviado!</h1>
           <p className="rav-sucesso-texto">
-            Recebemos o pedido de <strong>{dados.empresa}</strong> com {itensValidos.length}{' '}
-            {itensValidos.length === 1 ? 'item' : 'itens'}. Nossa equipe vai conferir a disponibilidade e entrar em
-            contato pelo telefone <strong>{dados.telefone}</strong> para confirmar prazo e valores.
+            Recebemos o pedido de <strong>{resumoEnviado.empresa}</strong> com {resumoEnviado.itens.length}{' '}
+            {resumoEnviado.itens.length === 1 ? 'item' : 'itens'}. Nossa equipe vai conferir a disponibilidade e entrar
+            em contato pelo telefone <strong>{resumoEnviado.telefone}</strong> para confirmar prazo e valores.
           </p>
           <div className="rav-sucesso-resumo">
             <span className="rav-resumo-titulo">Resumo do pedido</span>
             <ul>
-              {itensValidos.map((it, i) => (
+              {resumoEnviado.itens.map((it, i) => (
                 <li key={i}>
                   <span>{it.produto}</span>
                   <span className="rav-resumo-qtd">
@@ -232,11 +347,11 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
           <section id="sobre" className="rav-secao">
             <div className="rav-container">
               <span className="rav-secao-eyebrow">A empresa</span>
-              <h2 className="rav-secao-titulo">Uma distribuidora de bairro, com jeito de operação grande</h2>
+              <h2 className="rav-secao-titulo">Abastecimento confiável para operações que não podem parar</h2>
               <p className="rav-secao-texto">
-                A RAV nasceu como um negócio de família e cresceu junto com seus clientes. Hoje atendemos cozinhas
-                industriais, cafeterias e lounges corporativos, cuidando de cada pedido com a mesma atenção do primeiro
-                dia: conferindo item por item antes de sair para a entrega.
+                A RAV atende cozinhas industriais, cafeterias, restaurantes e lounges corporativos em toda a Grande São
+                Paulo. Nossa operação é construída em cima de previsibilidade: pedido registrado, disponibilidade
+                confirmada e entrega feita por equipe própria, com conferência item a item antes de cada saída.
               </p>
 
               <div className="rav-bento">
@@ -296,9 +411,7 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
               <div className="rav-form-cabecalho">
                 <span className="rav-secao-eyebrow">Fazer pedido</span>
                 <h2 className="rav-secao-titulo">Monte seu pedido</h2>
-                <p className="rav-secao-texto">
-                  Leva menos de dois minutos. Não precisa de cadastro nem senha.
-                </p>
+                <p className="rav-secao-texto">Leva menos de dois minutos. Não precisa de cadastro nem senha.</p>
               </div>
 
               <ol className="rav-stepper">
@@ -317,6 +430,12 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
               </ol>
 
               <div className="rav-card-form">
+                {semUnidades && (
+                  <p className="rav-erro">
+                    Não consegui carregar as unidades de medida. Recarregue a página antes de montar o pedido.
+                  </p>
+                )}
+
                 {etapa === 1 && (
                   <div className="rav-etapa">
                     <div className="rav-grid-2">
@@ -324,11 +443,10 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
                         <span>
                           Empresa <em>*</em>
                         </span>
-                        <input
-                          className="rav-input"
-                          value={dados.empresa}
-                          onChange={(e) => setCampo('empresa', e.target.value)}
-                          placeholder="Nome do estabelecimento"
+                        <EmpresaAutocomplete
+                          valor={dados.empresa}
+                          onChange={(v) => setCampo('empresa', v)}
+                          clientes={clientes}
                         />
                       </label>
                       <label className="rav-campo">
@@ -422,13 +540,16 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
                           />
                           <select
                             className="rav-input rav-col-unidade"
-                            value={item.unidade}
-                            onChange={(e) => setItem(idx, 'unidade', e.target.value)}
+                            value={item.unidade_id}
+                            onChange={(e) => setItem(idx, 'unidade_id', e.target.value)}
                             aria-label={`Unidade do item ${idx + 1}`}
                           >
-                            {listaUnidades.map((u) => (
-                              <option key={u} value={u}>
-                                {u.charAt(0) + u.slice(1).toLowerCase()}
+                            <option value="" disabled>
+                              Unidade
+                            </option>
+                            {unidades.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.nome.charAt(0) + u.nome.slice(1).toLowerCase()}
                               </option>
                             ))}
                           </select>
@@ -446,7 +567,7 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
                       ))}
                     </div>
 
-                    <button type="button" className="rav-add" onClick={addItem}>
+                    <button type="button" className="rav-add" onClick={addItem} disabled={semUnidades}>
                       <Plus size={16} /> Adicionar outro item
                     </button>
 
@@ -462,7 +583,9 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
                     </label>
 
                     {tentouAvancar && !itensOk && (
-                      <p className="rav-erro">Informe pelo menos um produto com quantidade maior que zero.</p>
+                      <p className="rav-erro">
+                        Informe pelo menos um produto com quantidade maior que zero e a unidade de medida.
+                      </p>
                     )}
                   </div>
                 )}
@@ -510,7 +633,7 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
                             <li key={i}>
                               <span>{it.produto}</span>
                               <span className="rav-resumo-qtd">
-                                {it.quantidade} {it.unidade.toLowerCase()}
+                                {it.quantidade} {nomeUnidade(it.unidade_id).toLowerCase()}
                               </span>
                             </li>
                           ))}
@@ -525,24 +648,33 @@ export default function PortalCliente({ unidades = [], produtos = [], onVoltar }
                       Ao enviar, nossa equipe confere a disponibilidade e retorna com prazo e valores. O pedido só é
                       confirmado depois desse retorno.
                     </p>
+                    {erroEnvio && <p className="rav-erro">{erroEnvio}</p>}
                   </div>
                 )}
 
                 <div className="rav-form-acoes">
                   {etapa > 1 ? (
-                    <button type="button" className="rav-btn rav-btn-fantasma" onClick={voltarEtapa}>
+                    <button type="button" className="rav-btn rav-btn-fantasma" onClick={voltarEtapa} disabled={enviando}>
                       <ArrowLeft size={16} /> Voltar
                     </button>
                   ) : (
                     <span />
                   )}
                   {etapa < 3 ? (
-                    <button type="button" className="rav-btn rav-btn-primario" onClick={avancar}>
+                    <button type="button" className="rav-btn rav-btn-primario" onClick={avancar} disabled={semUnidades}>
                       Continuar <ArrowRight size={16} />
                     </button>
                   ) : (
-                    <button type="button" className="rav-btn rav-btn-primario" onClick={enviar}>
-                      Enviar pedido <Check size={16} />
+                    <button type="button" className="rav-btn rav-btn-primario" onClick={enviar} disabled={enviando}>
+                      {enviando ? (
+                        <>
+                          <Sparkles size={16} /> Enviando…
+                        </>
+                      ) : (
+                        <>
+                          Enviar pedido <Check size={16} />
+                        </>
+                      )}
                     </button>
                   )}
                 </div>

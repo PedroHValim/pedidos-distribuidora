@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Circle, Truck, ChevronLeft, ChevronRight, AlertTriangle, Check } from 'lucide-react'
-import { STATUS_COLOR, STATUS_LABEL, nomeMes, mesAtual, normalizaProduto } from '../utils.js'
+import { STATUS_COLOR, STATUS_LABEL, nomeMes, mesAtual, normalizaTexto } from '../utils.js'
 
 export function StatusBadge({ status }) {
   const Icon = status === 'entregue' ? CheckCircle2 : status === 'separado' ? Truck : Circle
@@ -119,9 +119,9 @@ export function ProdutoAutocomplete({ value, onChange, produtos, className, plac
   const [aberto, setAberto] = useState(false)
 
   const sugestoes = useMemo(() => {
-    const termo = normalizaProduto(value)
+    const termo = normalizaTexto(value)
     if (!termo) return []
-    return produtos.filter((p) => normalizaProduto(p.nome).includes(termo)).slice(0, 6)
+    return produtos.filter((p) => normalizaTexto(p.nome).includes(termo)).slice(0, 6)
   }, [value, produtos])
 
   return (

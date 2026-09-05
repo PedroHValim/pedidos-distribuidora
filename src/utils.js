@@ -69,10 +69,10 @@ export function unidadePadraoId(unidades) {
   return unidades.find((u) => u.nome?.toUpperCase() === 'UNIDADES')?.id || unidades[0]?.id || ''
 }
 
-// Normaliza pra comparar nomes de produto: ignora maiúscula/minúscula,
-// acento (peça = peca) e espaços extras. Só usado pra comparar — o nome
-// digitado continua sendo salvo do jeito que a pessoa escreveu.
-export function normalizaProduto(nome) {
+// Normaliza pra comparar nomes (produto, empresa...): ignora maiúscula/
+// minúscula, acento (peça = peca) e espaços extras. Só usado pra comparar —
+// o nome digitado continua sendo salvo do jeito que a pessoa escreveu.
+export function normalizaTexto(nome) {
   return (nome || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

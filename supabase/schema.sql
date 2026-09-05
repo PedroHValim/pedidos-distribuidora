@@ -100,6 +100,12 @@ create table if not exists pedido_ia_avaliacoes (
 
 -- Pedidos (um por cliente/entrega) -------------------------------------------
 
+-- origem diz de onde veio o pedido: 'interno' (alguém digitou no app) ou
+-- 'portal' (o próprio cliente preencheu na página pública). Os campos de
+-- contato só vêm preenchidos nos pedidos do portal, porque ali não há
+-- ninguém da equipe pra saber com quem falar. empresa_digitada guarda o
+-- nome exatamente como o cliente escreveu — o cliente_id aponta pro cadastro
+-- que casamos com ele, que pode estar grafado de outro jeito.
 create table pedidos (
   id uuid primary key default gen_random_uuid(),
   cliente_id uuid not null references clientes(id),
@@ -107,6 +113,11 @@ create table pedidos (
   data_entrega date,
   status text not null default 'comprando' check (status in ('comprando', 'separado', 'entregue')),
   obs text,
+  origem text not null default 'interno' check (origem in ('interno', 'portal')),
+  empresa_digitada text,
+  contato_nome text,
+  contato_telefone text,
+  contato_email text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

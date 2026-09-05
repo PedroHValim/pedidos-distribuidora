@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle, X, Store } from 'lucide-react'
 import { supabase, supabaseConfigurado } from './supabaseClient.js'
-import { normalizaProduto, metodoEhCredito } from './utils.js'
+import { normalizaTexto, metodoEhCredito, todayISO } from './utils.js'
 import { ConfirmDialog, Toast } from './components/ui.jsx'
 import NovoPedido from './components/NovoPedido.jsx'
 import Compras from './components/Compras.jsx'
@@ -99,9 +99,9 @@ export default function App() {
   // sugestão de autocompletar da próxima vez. Isso é um "bônus" da gravação
   // do pedido — se falhar, não deve travar nem assustar com o banner de erro.
   async function registrarProdutosNovos(nomes, produtosConhecidos) {
-    const conhecidos = new Set(produtosConhecidos.map((p) => normalizaProduto(p.nome)))
+    const conhecidos = new Set(produtosConhecidos.map((p) => normalizaTexto(p.nome)))
     const novos = [...new Set(nomes.map((n) => n.trim()).filter(Boolean))].filter(
-      (nome) => !conhecidos.has(normalizaProduto(nome))
+      (nome) => !conhecidos.has(normalizaTexto(nome))
     )
     if (novos.length === 0) return
 
@@ -163,6 +163,70 @@ export default function App() {
 
     await fetchPedidos()
     setSalvando(false)
+  }
+
+  // Descobre a qual cliente cadastrado um nome digitado se refere. O cliente
+  // escreve do jeito dele, então comparamos ignorando acento/maiúscula. Só
+  // cadastra um cliente novo quando realmente não existe nenhum parecido —
+  // é isso que mantém os filtros e o painel agrupando certo.
+  async function resolverClienteId(nomeDigitado) {
+    const alvo = normalizaTexto(nomeDigitado)
+    const existente = clientes.find((c) => normalizaTexto(c.nome) === alvo)
+    if (existente) return existente.id
+
+    const { data, error } = await supabase.from('clientes').insert({ nome: nomeDigitado }).select().single()
+    // confere o id de verdade: sem isso, uma resposta fora do formato
+    // esperado seguia adiante e o pedido era gravado sem cliente_id
+    if (!error && data?.id) {
+      setClientes((prev) => [...prev, data].sort((a, b) => (a.nome || '').localeCompare(b.nome || '')))
+      return data.id
+    }
+
+    // o nome é único no banco: se deu conflito, alguém já cadastrou esse
+    // mesmo cliente enquanto isso — então é só buscar o registro existente
+    const { data: achado } = await supabase.from('clientes').select('id').ilike('nome', nomeDigitado).maybeSingle()
+    if (achado) return achado.id
+
+    throw new Error('Não consegui registrar a empresa. Confira o nome e tente de novo.')
+  }
+
+  // Grava um pedido vindo do portal do cliente. Cai como "comprando", igual a
+  // um pedido digitado internamente, então aparece na aba Compras na hora.
+  async function criarPedidoPortal(dadosPortal) {
+    const clienteId = await resolverClienteId(dadosPortal.empresa)
+    if (!clienteId) throw new Error('Não consegui identificar a empresa. Tente de novo.')
+
+    const { data: pedido, error: erroPedido } = await supabase
+      .from('pedidos')
+      .insert({
+        cliente_id: clienteId,
+        data_pedido: todayISO(),
+        data_entrega: dadosPortal.entrega || null,
+        obs: dadosPortal.obs || null,
+        status: 'comprando',
+        origem: 'portal',
+        empresa_digitada: dadosPortal.empresa,
+        contato_nome: dadosPortal.responsavel,
+        contato_telefone: dadosPortal.telefone,
+        contato_email: dadosPortal.email || null,
+      })
+      .select()
+      .single()
+
+    if (erroPedido) throw new Error(erroPedido.message)
+
+    const { error: erroItens } = await supabase.from('pedido_itens').insert(
+      dadosPortal.itens.map((it) => ({
+        pedido_id: pedido.id,
+        produto: it.produto,
+        quantidade: it.quantidade,
+        unidade_id: it.unidade_id,
+      }))
+    )
+    if (erroItens) throw new Error(erroItens.message)
+
+    await registrarProdutosNovos(dadosPortal.itens.map((it) => it.produto), produtos)
+    await fetchPedidos()
   }
 
   // Aplica a mudança na tela na hora e só depois grava. Antes cada toque
@@ -356,8 +420,10 @@ export default function App() {
   if (rota === ROTA_PORTAL) {
     return (
       <PortalCliente
+        clientes={clientes}
         unidades={unidades}
         produtos={produtos}
+        onEnviarPedido={criarPedidoPortal}
         onVoltar={() => {
           window.location.hash = ''
           window.scrollTo({ top: 0 })
