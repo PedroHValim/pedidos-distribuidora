@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle, X } from 'lucide-react'
+import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle, X, Store } from 'lucide-react'
 import { supabase, supabaseConfigurado } from './supabaseClient.js'
 import { normalizaProduto, metodoEhCredito } from './utils.js'
 import { ConfirmDialog, Toast } from './components/ui.jsx'
@@ -7,6 +7,12 @@ import NovoPedido from './components/NovoPedido.jsx'
 import Compras from './components/Compras.jsx'
 import Pedidos from './components/Pedidos.jsx'
 import Painel from './components/Painel.jsx'
+import PortalCliente from './components/PortalCliente.jsx'
+
+// Rota do portal do cliente. É por "#" (e não por caminho) porque o site é
+// estático no GitHub Pages: um caminho de verdade daria 404 ao recarregar a
+// página, já que não existe servidor pra redirecionar.
+const ROTA_PORTAL = '#/portal'
 
 // As abas aparecem em dois lugares: no topo (telas grandes) e numa barra
 // fixa embaixo no celular, onde o polegar alcança sem esticar a mão.
@@ -46,6 +52,7 @@ export default function App() {
   // confirmação. No celular é fácil demais encostar sem querer num botão.
   const [confirmacao, setConfirmacao] = useState(null)
   const [confirmando, setConfirmando] = useState(false)
+  const [rota, setRota] = useState(() => window.location.hash)
 
   async function fetchPedidos() {
     const { data, error } = await supabase
@@ -110,6 +117,12 @@ export default function App() {
 
   useEffect(() => {
     Promise.all([fetchPedidos(), fetchListasFixas()]).then(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    const aoTrocarHash = () => setRota(window.location.hash)
+    window.addEventListener('hashchange', aoTrocarHash)
+    return () => window.removeEventListener('hashchange', aoTrocarHash)
   }, [])
 
   async function criarPedido(form) {
@@ -337,6 +350,22 @@ export default function App() {
     }
   }
 
+  // O portal vem antes das telas de "carregando" e de configuração pendente
+  // de propósito: ele é a página do cliente, não deve depender do estado do
+  // app interno pra poder ser aberta.
+  if (rota === ROTA_PORTAL) {
+    return (
+      <PortalCliente
+        unidades={unidades}
+        produtos={produtos}
+        onVoltar={() => {
+          window.location.hash = ''
+          window.scrollTo({ top: 0 })
+        }}
+      />
+    )
+  }
+
   if (!supabaseConfigurado) {
     return (
       <div className="app">
@@ -368,6 +397,16 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div>
+          <button
+            type="button"
+            className="portal-link"
+            onClick={() => {
+              window.location.hash = ROTA_PORTAL
+              window.scrollTo({ top: 0 })
+            }}
+          >
+            <Store size={13} /> Portal do cliente
+          </button>
           <div className="eyebrow">controle de pedidos</div>
           <h1 className="title">Distribuidora</h1>
         </div>

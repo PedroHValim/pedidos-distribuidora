@@ -70,6 +70,29 @@ code {
   margin-bottom: 20px;
 }
 
+/* Atalho pro portal do cliente (página de teste, canto superior esquerdo) */
+.portal-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d8d6cc;
+  background: #fff;
+  color: #6b7268;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 6px 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.portal-link:hover {
+  color: #1d4ed8;
+  border-color: #bfd4f5;
+  background: #f2f6fd;
+}
+
 .eyebrow {
   font-size: 11px;
   letter-spacing: 0.08em;
