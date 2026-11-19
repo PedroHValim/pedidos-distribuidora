@@ -15,6 +15,7 @@ export default function Pedidos({
   onAvancarStatus,
   onExcluirPedido,
   onEditarPedido,
+  podeEditarPedido = false,
 }) {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState('Todos')
@@ -141,9 +142,11 @@ export default function Pedidos({
                           <Truck size={13} /> Marcar como Entregue
                         </button>
                       )}
-                      <button type="button" className="edit-pedido-btn" onClick={() => setEditandoId(p.id)}>
-                        <Pencil size={13} /> Editar
-                      </button>
+                      {podeEditarPedido && (
+                        <button type="button" className="edit-pedido-btn" onClick={() => setEditandoId(p.id)}>
+                          <Pencil size={13} /> Editar
+                        </button>
+                      )}
                       <button className="text-btn danger" onClick={() => onExcluirPedido(p.id)}>
                         Excluir
                       </button>

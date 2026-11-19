@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle, X, Store } from 'lucide-react'
+import { Plus, ClipboardList, LayoutDashboard, ShoppingCart, AlertCircle, X, Store, ShieldCheck, User } from 'lucide-react'
 import { supabase, supabaseConfigurado } from './supabaseClient.js'
 import { normalizaTexto, metodoEhCredito, todayISO } from './utils.js'
 import { ConfirmDialog, Toast } from './components/ui.jsx'
@@ -8,12 +8,16 @@ import Compras from './components/Compras.jsx'
 import Pedidos from './components/Pedidos.jsx'
 import Painel from './components/Painel.jsx'
 import PortalCliente from './components/PortalCliente.jsx'
+import Acesso from './components/Acesso.jsx'
 
 // Rota do portal do cliente. É por "#" (e não por caminho) porque o site é
 // estático no GitHub Pages: um caminho de verdade daria 404 ao recarregar a
 // página, já que não existe servidor pra redirecionar.
 const ROTA_PORTAL = '#/portal'
 const CHAVE_SESSAO_PORTAL = 'rav-portal-sessao'
+// Perfil de quem entrou no app interno ('normal' ou 'admin'). Fica na sessão do
+// navegador: ao fechar a aba/aplicativo, a tela de acesso aparece de novo.
+const CHAVE_PERFIL = 'rav-perfil'
 
 // As abas aparecem em dois lugares: no topo (telas grandes) e numa barra
 // fixa embaixo no celular, onde o polegar alcança sem esticar a mão.
@@ -54,6 +58,14 @@ export default function App() {
   const [confirmacao, setConfirmacao] = useState(null)
   const [confirmando, setConfirmando] = useState(false)
   const [rota, setRota] = useState(() => window.location.hash)
+  const [perfil, setPerfil] = useState(() => {
+    try {
+      const salvo = sessionStorage.getItem(CHAVE_PERFIL)
+      return salvo === 'admin' || salvo === 'normal' ? salvo : null
+    } catch {
+      return null
+    }
+  })
   // Empresa logada no portal do cliente. Fica no localStorage pra não pedir
   // senha toda vez — quem faz pedido costuma usar sempre o mesmo aparelho.
   const [sessaoPortal, setSessaoPortal] = useState(() => {
@@ -368,6 +380,8 @@ export default function App() {
   // tiver preço E forma de pagamento preenchidos — se algum dos dois for
   // apagado, o item volta a precisar ser comprado de novo.
   async function editarPedido(pedidoId, form) {
+    // o botão "Editar" já some para o perfil Normal; esta checagem é uma segunda trava
+    if (perfil !== 'admin') return
     setSalvandoEdicao(true)
 
     const { error: erroPedido } = await supabase
@@ -549,6 +563,32 @@ export default function App() {
     )
   }
 
+  function entrarComPerfil(novo) {
+    try {
+      sessionStorage.setItem(CHAVE_PERFIL, novo)
+    } catch {
+      /* sem sessionStorage: vale só até recarregar a página */
+    }
+    setPerfil(novo)
+    setTab('novo')
+  }
+
+  function sairDoPerfil() {
+    try {
+      sessionStorage.removeItem(CHAVE_PERFIL)
+    } catch {
+      /* ignora */
+    }
+    setPerfil(null)
+  }
+
+  // Tela de acesso: vem depois do portal e da checagem de configuração, antes do app.
+  if (!perfil) {
+    return <Acesso onEntrar={entrarComPerfil} />
+  }
+
+  const ehAdmin = perfil === 'admin'
+
   if (loading) {
     return (
       <div className="loading-wrap">
@@ -570,6 +610,14 @@ export default function App() {
             }}
           >
             <Store size={13} /> Portal do cliente
+          </button>
+          <button
+            type="button"
+            className={`perfil-chip ${ehAdmin ? 'perfil-chip-admin' : ''}`}
+            onClick={sairDoPerfil}
+            title="Trocar de perfil"
+          >
+            {ehAdmin ? <ShieldCheck size={13} /> : <User size={13} />} {ehAdmin ? 'Admin' : 'Normal'} · trocar
           </button>
           <div className="eyebrow">controle de pedidos</div>
           <h1 className="title">Distribuidora</h1>
@@ -621,6 +669,7 @@ export default function App() {
             onCompletarPedido={completarPedido}
             onExcluirPedido={pedirExclusaoPedido}
             onEditarPedido={editarPedido}
+            podeEditarPedido={ehAdmin}
           />
         )}
         {tab === 'pedidos' && (
@@ -635,6 +684,7 @@ export default function App() {
             onAvancarStatus={avancarStatus}
             onExcluirPedido={pedirExclusaoPedido}
             onEditarPedido={editarPedido}
+            podeEditarPedido={ehAdmin}
           />
         )}
         {tab === 'painel' && <Painel pedidos={pedidos} clientes={clientes} metodosPagamento={metodosPagamento} />}

@@ -189,6 +189,7 @@ export default function Compras({
   onCompletarPedido,
   onExcluirPedido,
   onEditarPedido,
+  podeEditarPedido = false,
 }) {
   const [editandoId, setEditandoId] = useState(null)
   const pedidosComprando = pedidos.filter((p) => p.status === 'comprando')
@@ -250,9 +251,11 @@ export default function Compras({
                     {itens.filter((it) => it.comprado).length}/{itens.length} comprados
                   </div>
                   <div className="pedido-top-acoes">
-                    <button type="button" className="edit-pedido-btn" onClick={() => setEditandoId(pedido.id)}>
-                      <Pencil size={13} /> Editar
-                    </button>
+                    {podeEditarPedido && (
+                      <button type="button" className="edit-pedido-btn" onClick={() => setEditandoId(pedido.id)}>
+                        <Pencil size={13} /> Editar
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="text-btn danger"
