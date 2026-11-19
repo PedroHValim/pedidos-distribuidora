@@ -160,12 +160,17 @@ export default function Pedidos({
                       })()}
                       {p.nf_path && (
                         <button type="button" className="nf-chip" onClick={() => onAbrirNota(p)} title="Abrir nota fiscal">
-                          <Paperclip size={12} /> <span>{p.nf_nome || 'Nota fiscal'}</span>
+                          <Paperclip size={12} /> <span>{p.nf_numero ? `NF ${p.nf_numero}` : p.nf_nome || 'Nota fiscal'}</span>
                         </button>
                       )}
-                      {p.nf_path && p.status === 'separado' && podeEditarPedido && (
+                      {p.nf_path && podeEditarPedido && (
                         <button type="button" className="edit-pedido-btn" onClick={() => setAnexandoPedido(p)}>
                           Trocar NF
+                        </button>
+                      )}
+                      {p.status === 'entregue' && 'nf_path' in p && !p.nf_path && (
+                        <button type="button" className="edit-pedido-btn" onClick={() => setAnexandoPedido(p)}>
+                          <Paperclip size={13} /> Anexar NF
                         </button>
                       )}
                       {podeEditarPedido && (
@@ -188,9 +193,10 @@ export default function Pedidos({
       {anexandoPedido && (
         <AnexarNota
           pedido={anexandoPedido}
+          pedeNumero={'nf_numero' in anexandoPedido}
           onFechar={() => setAnexandoPedido(null)}
-          onEnviar={async (arquivo) => {
-            const msg = await onAnexarNota(anexandoPedido, arquivo)
+          onEnviar={async (arquivo, numero) => {
+            const msg = await onAnexarNota(anexandoPedido, arquivo, numero)
             if (!msg) setAnexandoPedido(null)
             return msg
           }}

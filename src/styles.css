@@ -1535,3 +1535,13 @@ code {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.nf-numero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6b7268;
+}

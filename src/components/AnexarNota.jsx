@@ -4,16 +4,24 @@ import { FileText, Paperclip, X } from 'lucide-react'
 const LIMITE_MB = 10
 const TIPOS_OK = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
 
+// "NF 694- W PREMIUM ... .pdf" -> "694"; "BOLETO COMPLEMENTAR A NF 573.pdf" -> "573"
+function numeroDoNome(nome) {
+  const semExt = nome.replace(/\.[^.]+$/, '')
+  const m = semExt.match(/(?:nfe?|nota)[^0-9]{0,8}(\d{1,9})/i) || semExt.match(/(\d{3,6})/)
+  return m ? String(Number(m[1])) : ''
+}
+
 function tamanho(bytes) {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
 // Anexar a nota fiscal, no estilo "anexar documento" do WhatsApp:
 // escolhe o arquivo (ou tira uma foto no celular), vê a prévia e confirma.
-export default function AnexarNota({ pedido, onEnviar, onFechar }) {
+export default function AnexarNota({ pedido, pedeNumero = false, onEnviar, onFechar }) {
   const inputRef = useRef(null)
   const [arquivo, setArquivo] = useState(null)
   const [previa, setPrevia] = useState(null)
+  const [numero, setNumero] = useState('')
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
 
@@ -49,12 +57,17 @@ export default function AnexarNota({ pedido, onEnviar, onFechar }) {
     }
     setErro('')
     setArquivo(f)
+    setNumero(numeroDoNome(f.name))
   }
 
   async function enviar() {
+    if (pedeNumero && !numero.trim()) {
+      setErro('Informe o número da NF (ele serve para o financeiro ligar o boleto ao pedido).')
+      return
+    }
     setEnviando(true)
     setErro('')
-    const msg = await onEnviar(arquivo)
+    const msg = await onEnviar(arquivo, numero.trim())
     setEnviando(false)
     if (msg) setErro(msg) // onEnviar devolve o texto do erro; sem erro, o pai fecha a janela
   }
@@ -95,6 +108,19 @@ export default function AnexarNota({ pedido, onEnviar, onFechar }) {
             <div className="nf-previa-nome">{arquivo.name}</div>
             <div className="nf-previa-info">{tamanho(arquivo.size)}</div>
           </div>
+        )}
+
+        {arquivo && pedeNumero && (
+          <label className="nf-numero">
+            <span>Nº da NF</span>
+            <input
+              className="input"
+              inputMode="numeric"
+              value={numero}
+              onChange={(e) => setNumero(e.target.value.replace(/[^0-9.]/g, ''))}
+              placeholder="Ex.: 694"
+            />
+          </label>
         )}
 
         {erro && <div className="nf-erro">{erro}</div>}

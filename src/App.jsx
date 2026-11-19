@@ -478,7 +478,7 @@ export default function App() {
   // (a coluna nf_path passa a existir nos pedidos).
   const exigeNotaFiscal = (pedido) => 'nf_path' in pedido
 
-  async function anexarNotaFiscal(pedido, arquivo) {
+  async function anexarNotaFiscal(pedido, arquivo, numero) {
     const nomeSeguro = arquivo.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '_')
     const caminho = `${pedido.id}/${Date.now()}-${nomeSeguro}`
     const { error: erroUpload } = await supabase.storage
@@ -488,7 +488,14 @@ export default function App() {
 
     const { error: erroPedido } = await supabase
       .from('pedidos')
-      .update({ nf_path: caminho, nf_nome: arquivo.name, nf_tipo: arquivo.type || null, nf_anexada_em: new Date().toISOString() })
+      .update({
+        nf_path: caminho,
+        nf_nome: arquivo.name,
+        nf_tipo: arquivo.type || null,
+        nf_anexada_em: new Date().toISOString(),
+        // só grava o número se a coluna já existe (depois de rodar o SQL novo)
+        ...('nf_numero' in pedido ? { nf_numero: numero || null } : {}),
+      })
       .eq('id', pedido.id)
     if (erroPedido) {
       await supabase.storage.from('notas-fiscais').remove([caminho]) // não deixa arquivo solto
