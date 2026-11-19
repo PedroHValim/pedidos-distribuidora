@@ -11,7 +11,7 @@ import '../acesso.css'
 // ATENÇÃO: isso é um controle de uso (evita edição sem querer), não uma
 // proteção de segurança — quem tem acesso ao código ainda pode contornar. Para
 // proteger de verdade, o próximo passo é usar o login do Supabase + regras (RLS).
-const HASH_SENHA_ADMIN = '766d0df983f9d98ba486287f8e5c4c831937e074f0dee434857fa0c68d348ea0'
+const HASH_SENHA_ADMIN = '5edd6b7ba99be850ab24ef3acbb3b0de8f0dcb9a04e70b819b87ab641c88faee'
 
 async function sha256Hex(texto) {
   const bytes = new TextEncoder().encode(texto)
