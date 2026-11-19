@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Package, Pencil, Search, Truck } from 'lucide-react'
+import { Package, Paperclip, Pencil, Search, Truck } from 'lucide-react'
 import { StatusBadge, MonthNavigator } from './ui.jsx'
 import EditarPedidoForm from './EditarPedidoForm.jsx'
+import AnexarNota from './AnexarNota.jsx'
 import { currency, formatData, pedidoCustoTotal, itemCustoTotal, mesAtual, somarMeses, mesRefISO } from '../utils.js'
 
 export default function Pedidos({
@@ -13,6 +14,8 @@ export default function Pedidos({
   produtos,
   salvandoEdicao,
   onAvancarStatus,
+  onAnexarNota,
+  onAbrirNota,
   onExcluirPedido,
   onEditarPedido,
   podeEditarPedido = false,
@@ -21,6 +24,7 @@ export default function Pedidos({
   const [filtro, setFiltro] = useState('Todos')
   const [mesNav, setMesNav] = useState(() => mesAtual())
   const [editandoId, setEditandoId] = useState(null)
+  const [anexandoPedido, setAnexandoPedido] = useState(null)
 
   function irParaMes(delta) {
     setMesNav((atual) => somarMeses(atual, delta))
@@ -137,9 +141,31 @@ export default function Pedidos({
                     {p.obs && <div className="pedido-obs">{p.obs}</div>}
 
                     <div className="pedido-actions">
-                      {p.status === 'separado' && (
-                        <button className="advance-btn" onClick={() => onAvancarStatus(p)}>
-                          <Truck size={13} /> Marcar como Entregue
+                      {p.status === 'separado' && (() => {
+                        const exigeNF = 'nf_path' in p // só depois de rodar supabase/nota_fiscal.sql
+                        const semNF = exigeNF && !p.nf_path
+                        return (
+                          <>
+                            {semNF && (
+                              <button type="button" className="advance-btn" onClick={() => setAnexandoPedido(p)}>
+                                <Paperclip size={13} /> Anexar nota fiscal
+                              </button>
+                            )}
+                            <button className="advance-btn" onClick={() => onAvancarStatus(p)} disabled={semNF}>
+                              <Truck size={13} /> Marcar como Entregue
+                            </button>
+                            {semNF && <div className="nf-aviso">Anexe a nota fiscal para poder marcar como entregue.</div>}
+                          </>
+                        )
+                      })()}
+                      {p.nf_path && (
+                        <button type="button" className="nf-chip" onClick={() => onAbrirNota(p)} title="Abrir nota fiscal">
+                          <Paperclip size={12} /> <span>{p.nf_nome || 'Nota fiscal'}</span>
+                        </button>
+                      )}
+                      {p.nf_path && p.status === 'separado' && podeEditarPedido && (
+                        <button type="button" className="edit-pedido-btn" onClick={() => setAnexandoPedido(p)}>
+                          Trocar NF
                         </button>
                       )}
                       {podeEditarPedido && (
@@ -157,6 +183,18 @@ export default function Pedidos({
             )
           })}
         </div>
+      )}
+
+      {anexandoPedido && (
+        <AnexarNota
+          pedido={anexandoPedido}
+          onFechar={() => setAnexandoPedido(null)}
+          onEnviar={async (arquivo) => {
+            const msg = await onAnexarNota(anexandoPedido, arquivo)
+            if (!msg) setAnexandoPedido(null)
+            return msg
+          }}
+        />
       )}
     </div>
   )

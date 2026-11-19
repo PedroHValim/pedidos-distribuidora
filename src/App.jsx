@@ -474,7 +474,53 @@ export default function App() {
     await fetchPedidos()
   }
 
+  // Nota fiscal do pedido: só exigimos depois de rodar supabase/nota_fiscal.sql
+  // (a coluna nf_path passa a existir nos pedidos).
+  const exigeNotaFiscal = (pedido) => 'nf_path' in pedido
+
+  async function anexarNotaFiscal(pedido, arquivo) {
+    const nomeSeguro = arquivo.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '_')
+    const caminho = `${pedido.id}/${Date.now()}-${nomeSeguro}`
+    const { error: erroUpload } = await supabase.storage
+      .from('notas-fiscais')
+      .upload(caminho, arquivo, { contentType: arquivo.type || undefined })
+    if (erroUpload) return `Não consegui enviar o arquivo: ${erroUpload.message}`
+
+    const { error: erroPedido } = await supabase
+      .from('pedidos')
+      .update({ nf_path: caminho, nf_nome: arquivo.name, nf_tipo: arquivo.type || null, nf_anexada_em: new Date().toISOString() })
+      .eq('id', pedido.id)
+    if (erroPedido) {
+      await supabase.storage.from('notas-fiscais').remove([caminho]) // não deixa arquivo solto
+      return `Não consegui vincular a nota ao pedido: ${erroPedido.message}`
+    }
+    // troca de nota: apaga o arquivo antigo
+    if (pedido.nf_path) await supabase.storage.from('notas-fiscais').remove([pedido.nf_path])
+
+    setErro('')
+    setAviso('Nota fiscal anexada')
+    await fetchPedidos()
+    return ''
+  }
+
+  async function abrirNotaFiscal(pedido) {
+    // abre a aba antes do pedido assíncrono, senão o navegador do celular bloqueia
+    const aba = window.open('', '_blank')
+    const { data, error } = await supabase.storage.from('notas-fiscais').createSignedUrl(pedido.nf_path, 120)
+    if (error || !data?.signedUrl) {
+      aba?.close()
+      setErro(`Não consegui abrir a nota fiscal: ${error?.message || 'arquivo não encontrado'}`)
+      return
+    }
+    if (aba) aba.location.href = data.signedUrl
+    else window.location.href = data.signedUrl
+  }
+
   async function avancarStatus(pedido) {
+    if (pedido.status === 'separado' && exigeNotaFiscal(pedido) && !pedido.nf_path) {
+      setErro('Anexe a nota fiscal do pedido antes de marcar como entregue.')
+      return
+    }
     const proximo = pedido.status === 'separado' ? 'entregue' : pedido.status
     const { error } = await supabase.from('pedidos').update({ status: proximo }).eq('id', pedido.id)
     if (error) setErro(error.message)
@@ -682,6 +728,8 @@ export default function App() {
             produtos={produtos}
             salvandoEdicao={salvandoEdicao}
             onAvancarStatus={avancarStatus}
+            onAnexarNota={anexarNotaFiscal}
+            onAbrirNota={abrirNotaFiscal}
             onExcluirPedido={pedirExclusaoPedido}
             onEditarPedido={editarPedido}
             podeEditarPedido={ehAdmin}

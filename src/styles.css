@@ -1418,3 +1418,120 @@ code {
     flex: 1 1 100px;
   }
 }
+
+/* ---------- nota fiscal anexada ao pedido ---------- */
+.nf-sheet {
+  text-align: left;
+}
+.nf-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.nf-fechar {
+  border: 0;
+  background: transparent;
+  color: #6b7268;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.nf-escolher {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 12px;
+  margin: 12px 0;
+  border: 2px dashed #c9d8d2;
+  border-radius: 12px;
+  background: #f6faf8;
+  color: #2f6f62;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.nf-previa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #e3e1da;
+  border-radius: 12px;
+  background: #fafaf7;
+}
+.nf-previa-img {
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.nf-previa-doc {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #eaf2ee;
+  color: #2f6f62;
+}
+.nf-previa-nome {
+  font-weight: 700;
+  font-size: 12.5px;
+  word-break: break-all;
+  text-align: center;
+}
+.nf-previa-info {
+  font-size: 11.5px;
+  color: #8a9089;
+}
+.nf-erro {
+  color: #b3392f;
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.nf-enviar {
+  background: #2f6f62;
+  color: #fff;
+  border: 0;
+}
+.nf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid #b9d6cd;
+  background: #f1f7f5;
+  color: #2f6f62;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 6px 12px;
+  cursor: pointer;
+  min-height: 32px;
+}
+.nf-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.nf-aviso {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  color: #8a9089;
+  font-weight: 600;
+}
+.advance-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
