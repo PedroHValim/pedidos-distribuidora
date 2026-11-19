@@ -66,12 +66,10 @@ export default function Acesso({ onEntrar }) {
               <button type="button" className="acesso-opcao" onClick={() => onEntrar('normal')}>
                 <User size={22} />
                 <span className="acesso-opcao-titulo">Normal</span>
-                <span className="acesso-opcao-desc">Lança pedidos, faz as compras e acompanha tudo.</span>
               </button>
               <button type="button" className="acesso-opcao acesso-opcao-admin" onClick={() => setPedindoSenha(true)}>
                 <ShieldCheck size={22} />
                 <span className="acesso-opcao-titulo">Admin</span>
-                <span className="acesso-opcao-desc">Também pode editar um pedido depois de lançado.</span>
               </button>
             </div>
           </>
